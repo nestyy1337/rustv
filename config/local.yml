@@ -1,11 +1,6 @@
 database:
-    username: "dev_user"
-    password: "dev_password"
-    port: "5432"
-    host: "localhost"
-    database_name: "myapp_dev"
-    require_ssl: false
+    database_path: "./main.db"
 
 application:
     port: "8000"
-    host: "127.0.0.1"
+    host: "0.0.0.0"
