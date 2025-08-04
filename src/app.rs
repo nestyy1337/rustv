@@ -1,11 +1,38 @@
 use anyhow::Result;
-use std::{marker::PhantomData, net::Ipv4Addr};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::{Executor, Pool, prelude::FromRow};
+use std::{marker::PhantomData, net::Ipv4Addr, sync::Arc};
+use tower_http::trace::TraceLayer;
+use tracing::info;
 
-use axum::{Router, routing::get};
+use axum::{Router, extract::State, routing::get};
 use tokio::net::TcpListener;
 
-// basic handler that responds with a static string
-async fn root() -> &'static str {
+use crate::common::logging::{
+    trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub display_name: Option<String>,
+    pub is_admin: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+async fn root(State(state): State<Arc<AppState>>) -> &'static str {
+    info!("Handling root request");
+    let x = sqlx::query_as::<_, User>("SELECT * FROM users LIMIT 1")
+        .fetch_one(&state.pool)
+        .await
+        .expect("Failed to fetch user from database");
+    info!("Fetched user: {:?}", x);
     "Hello, World!"
 }
 
@@ -125,6 +152,16 @@ impl AppBuilder<AddressSet, PortSet> {
     }
 }
 
+pub struct AppState {
+    pool: Pool<sqlx::Sqlite>,
+}
+
+impl AppState {
+    pub fn new(pool: Pool<sqlx::Sqlite>) -> Self {
+        Self { pool: pool }
+    }
+}
+
 pub struct App {
     listener: TcpListener,
     tls: bool,
@@ -132,8 +169,15 @@ pub struct App {
 }
 
 impl App {
-    pub async fn run(self) -> Result<()> {
-        let app = Router::new().route("/", get(root));
+    pub async fn run(self, pool: sqlx::SqlitePool) -> Result<()> {
+        let trace_layer = TraceLayer::new_for_http()
+            .make_span_with(trace_layer_make_span_with)
+            .on_request(trace_layer_on_request)
+            .on_response(trace_layer_on_response);
+        let app = Router::new()
+            .route("/", get(root))
+            .with_state(Arc::new(AppState::new(pool)))
+            .layer(trace_layer);
 
         axum::serve(self.listener, app).await?;
         Ok(())
