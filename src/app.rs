@@ -1,33 +1,60 @@
 use anyhow::Result;
+use axum::extract::Request;
+use axum::http::StatusCode;
+use axum::middleware::{FromFnLayer, Next, from_fn};
+use axum::response::{IntoResponse, Redirect, Response};
+use axum::routing::Route;
+use axum::{debug_handler, middleware};
+use axum_messages::MessagesManagerLayer;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Pool, prelude::FromRow};
 use std::{marker::PhantomData, net::Ipv4Addr, sync::Arc};
+use tower::Layer;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{ExpiredDeletion, Session, SessionStore, cookie};
+use tower_sessions::{Expiry, SessionManagerLayer, cookie::time::Duration};
+use tower_sessions_sqlx_store::{SqliteStore, sqlx::SqlitePool};
 use tracing::info;
 
 use axum::{Router, extract::State, routing::get};
 use tokio::net::TcpListener;
 
-use crate::common::logging::{
+use crate::auth;
+use crate::shared::logging::{
     trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
 };
+use crate::shared::middleware::{
+    AuthBackend, AuthBackendSqlite, AuthLayer, AuthSession, AuthSessionData, UserAuthData,
+};
+use crate::users::users::User;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct User {
-    pub id: i64,
-    pub username: String,
-    pub email: String,
-    #[serde(skip_serializing)]
-    pub password_hash: String,
-    pub display_name: Option<String>,
-    pub is_admin: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+async fn prot(
+    State(state): State<Arc<AppState>>,
+    mut session: AuthSession<AuthBackendSqlite>,
+) -> &'static str {
+    let x = sqlx::query_as::<_, User>("SELECT * FROM users LIMIT 1")
+        .fetch_one(&state.pool)
+        .await
+        .expect("Failed to fetch user from database");
+    info!("Fetched user: {:?}", x);
+    "Hello, World!"
 }
 
-async fn root(State(state): State<Arc<AppState>>) -> &'static str {
+#[debug_handler]
+async fn root(
+    State(state): State<Arc<AppState>>,
+    mut session: AuthSession<AuthBackendSqlite>,
+) -> &'static str {
     info!("Handling root request");
+    // if let Some(user) = session.session.user_id().await {
+    //     info!("User is logged in: {:?}", user);
+    // } else {
+    //     info!("User is not logged in");
+    // }
+    //
+    println!("Session data at root handler: {:?}", session);
+
     let x = sqlx::query_as::<_, User>("SELECT * FROM users LIMIT 1")
         .fetch_one(&state.pool)
         .await
@@ -153,7 +180,7 @@ impl AppBuilder<AddressSet, PortSet> {
 }
 
 pub struct AppState {
-    pool: Pool<sqlx::Sqlite>,
+    pub pool: Pool<sqlx::Sqlite>,
 }
 
 impl AppState {
@@ -168,15 +195,84 @@ pub struct App {
     prod: bool,
 }
 
+fn is_logged_in(req: &Request) -> impl std::future::Future<Output = bool> {
+    async move {
+        req.extensions()
+            .get::<AuthSession<AuthBackendSqlite>>()
+            .map_or(false, |session| {
+                session
+                    .inner
+                    .username()
+                    .is_some_and(|username| username == "test1234")
+            })
+    }
+}
+
+pub async fn require_auth(
+    session: Session,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    if let Ok(Some(_user_id)) = session.get::<String>("user_id").await {
+        Ok(next.run(request).await)
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+pub async fn require_auth_redirect(
+    session: AuthSession<AuthBackendSqlite>,
+    request: Request,
+    next: Next,
+) -> Response {
+    // Check if user_id exists in session
+    println!("Session inner: {:?}", session.inner);
+    if session.inner.is_admin() {
+        // User is logged in, continue to the next handler
+        info!("User is logged in, proceeding to next handler");
+        next.run(request).await
+    } else {
+        // User is not logged in, redirect to login page
+        info!("User is not logged in, redirecting to login page");
+        let login_url = format!("/login?next={}", request.uri().path());
+        Redirect::to(&login_url).into_response()
+    }
+}
+
 impl App {
     pub async fn run(self, pool: sqlx::SqlitePool) -> Result<()> {
+        let session_store = SqliteStore::new(pool.clone());
+        session_store.migrate().await?;
+
+        // let deletion_task = tokio::spawn({
+        //     session_store
+        //         .clone()
+        //         .continuously_delete_expired(tokio::time::Duration::from_secs(60))
+        // });
+
+        let auth_layer = AuthLayer { db: pool.clone() };
+
+        let protected_route = Router::new()
+            .route("/", get(prot))
+            .route_layer(from_fn(require_auth_redirect)); // Apply to all routes in this Router
+
+        let session_layer = SessionManagerLayer::new(session_store)
+            .with_secure(false)
+            .with_same_site(cookie::SameSite::Lax)
+            .with_expiry(Expiry::OnInactivity(Duration::days(30)));
+
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(trace_layer_make_span_with)
             .on_request(trace_layer_on_request)
             .on_response(trace_layer_on_response);
+
         let app = Router::new()
-            .route("/", get(root))
+            .route("/test", get(root))
+            .merge(protected_route)
+            .merge(auth::login::router())
             .with_state(Arc::new(AppState::new(pool)))
+            .layer(auth_layer)
+            .layer(session_layer)
             .layer(trace_layer);
 
         axum::serve(self.listener, app).await?;

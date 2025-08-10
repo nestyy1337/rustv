@@ -1,4 +1,4 @@
-use crate::common::logging::Instrumentation;
+use crate::shared::logging::Instrumentation;
 
 #[derive(clap::Parser, Debug)]
 pub struct InputArgs {

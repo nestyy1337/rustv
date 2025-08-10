@@ -2,8 +2,7 @@ use std::net::Ipv4Addr;
 
 use backend::{
     app::AppBuilder,
-    args::InputArgs,
-    common::config::{SETTINGS, Settings},
+    shared::{args::InputArgs, config::SETTINGS},
 };
 use clap::{Args, Parser};
 use tracing::{debug, info, trace};
@@ -21,9 +20,9 @@ async fn main() {
         .await
         .expect("failed to connect to database");
 
-    let socketaddress = Ipv4Addr::new(0, 0, 0, 0);
+    let socket_address = Ipv4Addr::new(0, 0, 0, 0);
     let app = AppBuilder::new()
-        .address(socketaddress)
+        .address(socket_address)
         .port(config.application.port.into())
         .build()
         .await

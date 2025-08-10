@@ -1,4 +1,4 @@
 pub mod app;
-pub mod args;
-pub mod common;
-pub mod domain;
+pub mod auth;
+pub mod shared;
+pub mod users;
