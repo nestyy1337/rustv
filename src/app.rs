@@ -259,7 +259,9 @@ impl App {
             .layer(session_layer)
             .layer(trace_layer);
 
-        axum::serve(self.listener, app).await?;
+        axum::serve(self.listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
         Ok(())
     }
 
@@ -276,6 +278,22 @@ impl App {
     pub fn local_address(&self) -> Option<std::net::SocketAddr> {
         self.listener.local_addr().ok()
     }
+}
+
+pub async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to install Ctrl+C handler");
+    info!("Received shutdown signal, shutting down gracefully...");
+}
+
+#[cfg(unix)]
+pub async fn terminate() {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal");
+    sigterm.recv().await;
+    info!("Received SIGTERM, shutting down gracefully...");
 }
 
 #[cfg(test)]
