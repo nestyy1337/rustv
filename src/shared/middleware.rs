@@ -13,7 +13,7 @@ use tokio::{sync::Mutex, task};
 use tower::{Layer, Service};
 use tower_sessions::{Session, SessionStore, session::Id};
 use tower_sessions_sqlx_store::SqliteStore;
-use tracing::{debug, info};
+use tracing::{Instrument, debug, info};
 
 use crate::{
     shared::error::Error,
@@ -63,46 +63,50 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
+        let span = tracing::info_span!("auth_layer", user = tracing::field::Empty);
         let backend = self.backend.clone();
 
         let mut service = self.service.clone();
-        Box::pin(async move {
-            let Some(session) = req.extensions().get::<Session>().cloned() else {
-                tracing::error!("session not found in guest extensions");
-                let mut res = Response::default();
-                *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
-                return Ok(res);
-            };
-
-            let auth_session = match AuthSession::from_session(session, backend.clone()).await {
-                Ok(auth_session) => {
-                    debug!("Created auth session from session: {:?}", auth_session);
-                    auth_session
-                }
-                Err(err) => {
-                    tracing::error!(
-                        err = %err,
-                        "could not create auth session from session"
-                    );
+        Box::pin(
+            async move {
+                let Some(session) = req.extensions().get::<Session>().cloned() else {
+                    tracing::error!("session not found in guest extensions");
                     let mut res = Response::default();
                     *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
                     return Ok(res);
+                };
+
+                let auth_session = match AuthSession::from_session(session, backend.clone()).await {
+                    Ok(auth_session) => {
+                        debug!("Created auth session from session: {:?}", auth_session);
+                        auth_session
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            err = %err,
+                            "could not create auth session from session"
+                        );
+                        let mut res = Response::default();
+                        *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
+                        return Ok(res);
+                    }
+                };
+
+                if let Some(ref id) = auth_session.id().await {
+                    info!(
+                        user_id = id.to_string(),
+                        "Authenticated user found in session"
+                    );
+                } else {
+                    tracing::warn!("No authenticated user found in session");
                 }
-            };
 
-            if let Some(ref id) = auth_session.id().await {
-                info!(
-                    user_id = id.to_string(),
-                    "Authenticated user found in session"
-                );
-            } else {
-                tracing::warn!("No authenticated user found in session");
+                req.extensions_mut().insert(auth_session);
+
+                service.call(req).await
             }
-
-            req.extensions_mut().insert(auth_session);
-
-            service.call(req).await
-        })
+            .instrument(span),
+        )
     }
 }
 
@@ -232,6 +236,7 @@ impl AuthSession<AuthBackendSqlite> {
         self.backend.authenticate(creds)
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(user = user.id().to_string()))]
     pub async fn login(&mut self, user: User) -> Result<(), Error> {
         let mut inner = self.inner.lock().await;
         let auth_hash = user.session_auth_hash().to_vec();
@@ -251,6 +256,7 @@ impl AuthSession<AuthBackendSqlite> {
         self.update_session().await
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(user = ?self.inner.lock().await.user))]
     pub async fn logout(&mut self) -> Result<(), Error> {
         let mut inner = self.inner.lock().await;
         inner.data = UserAuthData::default();
@@ -316,6 +322,7 @@ pub trait AuthBackend<T: SessionStore> {
 impl AuthBackend<SqliteStore> for AuthBackendSqlite {
     type Error = Error;
 
+    #[tracing::instrument(level = "info", skip_all, fields(user = creds.username))]
     async fn authenticate(&self, creds: Credentials) -> Result<Option<User>, Self::Error> {
         let user: Option<User> = sqlx::query_as("select * from users where username = ? ")
             .bind(creds.username)

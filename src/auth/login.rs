@@ -29,6 +29,7 @@ use crate::{
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct LoginTemplate {
+    lang: String,
     next: Option<String>,
 }
 
@@ -191,7 +192,14 @@ mod get {
     use super::*;
 
     pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> Html<String> {
-        Html(LoginTemplate { next }.render().unwrap())
+        Html(
+            LoginTemplate {
+                next,
+                lang: "en".to_string(),
+            }
+            .render()
+            .unwrap(),
+        )
     }
 
     pub async fn register(Query(NextUrl { next }): Query<NextUrl>) -> Html<String> {

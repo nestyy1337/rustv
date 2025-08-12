@@ -51,6 +51,10 @@ impl User {
     pub fn session_auth_hash(&self) -> &[u8] {
         self.password_hash.as_bytes()
     }
+
+    pub fn id(&self) -> i64 {
+        self.id
+    }
 }
 
 // impl AuthUser for User {

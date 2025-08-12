@@ -28,7 +28,7 @@ serde-aux = "4.7.0"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio-native-tls", "chrono"] }
 sqlx-sqlite = "0.8.6"
 thiserror = "2.0.12"
-tokio = { version = "1.47.1", features = ["rt", "macros", "rt-multi-thread", "test-util"] }
+tokio = { version = "1.47.1", features = ["rt", "macros", "rt-multi-thread", "test-util", "signal"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["trace"] }
 tower-sessions = "0.14.0"
