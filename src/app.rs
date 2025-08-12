@@ -195,19 +195,6 @@ pub struct App {
     prod: bool,
 }
 
-fn is_logged_in(req: &Request) -> impl std::future::Future<Output = bool> {
-    async move {
-        req.extensions()
-            .get::<AuthSession<AuthBackendSqlite>>()
-            .map_or(false, |session| {
-                session
-                    .inner
-                    .username()
-                    .is_some_and(|username| username == "test1234")
-            })
-    }
-}
-
 pub async fn require_auth(
     session: Session,
     request: Request,
@@ -225,16 +212,12 @@ pub async fn require_auth_redirect(
     request: Request,
     next: Next,
 ) -> Response {
-    // Check if user_id exists in session
-    println!("Session inner: {:?}", session.inner);
-    if session.inner.is_admin() {
-        // User is logged in, continue to the next handler
+    if session.is_user().await {
         info!("User is logged in, proceeding to next handler");
         next.run(request).await
     } else {
-        // User is not logged in, redirect to login page
         info!("User is not logged in, redirecting to login page");
-        let login_url = format!("/login?next={}", request.uri().path());
+        let login_url = format!("/login?next={}", urlencoding::encode(request.uri().path()));
         Redirect::to(&login_url).into_response()
     }
 }
@@ -244,22 +227,23 @@ impl App {
         let session_store = SqliteStore::new(pool.clone());
         session_store.migrate().await?;
 
-        // let deletion_task = tokio::spawn({
-        //     session_store
-        //         .clone()
-        //         .continuously_delete_expired(tokio::time::Duration::from_secs(60))
-        // });
+        let _deletion_task = tokio::spawn({
+            session_store
+                .clone()
+                .continuously_delete_expired(tokio::time::Duration::from_secs(60))
+        });
 
         let auth_layer = AuthLayer { db: pool.clone() };
 
         let protected_route = Router::new()
-            .route("/", get(prot))
-            .route_layer(from_fn(require_auth_redirect)); // Apply to all routes in this Router
+            .route("/protected", get(prot))
+            .route("/", get(root))
+            .route_layer(from_fn(require_auth_redirect));
 
         let session_layer = SessionManagerLayer::new(session_store)
             .with_secure(false)
             .with_same_site(cookie::SameSite::Lax)
-            .with_expiry(Expiry::OnInactivity(Duration::days(30)));
+            .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
 
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(trace_layer_make_span_with)
@@ -277,6 +261,10 @@ impl App {
 
         axum::serve(self.listener, app).await?;
         Ok(())
+    }
+
+    pub fn address(&self) -> Option<String> {
+        self.listener.local_addr().ok().map(|addr| addr.to_string())
     }
 
     pub fn is_tls_enabled(&self) -> bool {

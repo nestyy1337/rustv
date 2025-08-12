@@ -29,4 +29,6 @@ pub enum Error {
     SessionUpdateFailed,
     #[error("Session flush failed")]
     SessionFlushFailed,
+    #[error("Session clear failed")]
+    SessionClearFailed,
 }

@@ -82,6 +82,7 @@ mod post {
 
     use axum::extract::State;
     use tower_sessions::Session;
+    use tracing::{info, warn};
 
     use crate::{
         shared::{error::Error, middleware::AuthSessionData},
@@ -94,17 +95,36 @@ mod post {
         mut auth_session: AuthSession<AuthBackendSqlite>,
         Form(creds): Form<Credentials>,
     ) -> impl IntoResponse {
+        if auth_session.is_user().await {
+            info!("User already authenticated, redirecting");
+            return if let Some(ref next) = creds.next {
+                Redirect::to(next)
+            } else {
+                Redirect::to("/")
+            }
+            .into_response();
+        } else {
+            info!("User not authenticated, proceeding with login");
+        }
+
         let user = match auth_session.authenticate(creds.clone()).await {
-            Ok(Some(user)) => user,
+            Ok(Some(user)) => {
+                info!("User authenticated: {}", user.username);
+                user
+            }
             Ok(None) => {
+                info!("Authentication failed for user: {}", creds.username);
                 let mut login_url = "/login".to_string();
                 if let Some(next) = creds.next {
-                    login_url = format!("{login_url}?next={next}");
+                    login_url = format!("{login_url}");
                 };
 
                 return Redirect::to(&login_url).into_response();
             }
-            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(err) => {
+                warn!("Authentication failed: {}", err);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
         };
 
         if auth_session.login(user).await.is_err() {
@@ -179,10 +199,10 @@ mod get {
     }
 
     pub async fn logout(mut auth_session: AuthSession<AuthBackendSqlite>) -> impl IntoResponse {
-        // match auth_session.logout().await {
-        //     Ok(_) => Redirect::to("/login").into_response(),
-        //     Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        // }
+        match auth_session.logout().await {
+            Ok(_) => Redirect::to("/login").into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
     }
 }
 

@@ -1,27 +1,19 @@
 use core::fmt;
-use std::{collections::HashMap, pin::Pin, str::FromStr, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 
 use argon2::{self, PasswordHash, PasswordVerifier};
 
-use async_trait::async_trait;
 use axum::{
     extract::{FromRequestParts, Request},
     http::{self, Response, StatusCode, request::Parts},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{
-    SqlitePool,
-    types::{JsonValue, time::OffsetDateTime},
-};
-use tokio::task;
+use sqlx::SqlitePool;
+use tokio::{sync::Mutex, task};
 use tower::{Layer, Service};
-use tower_sessions::{
-    Expiry, Session, SessionStore,
-    cookie::time::Duration,
-    session::{Id, Record},
-};
+use tower_sessions::{Session, SessionStore, session::Id};
 use tower_sessions_sqlx_store::SqliteStore;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     shared::error::Error,
@@ -72,24 +64,21 @@ where
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
         let backend = self.backend.clone();
-        let data_key = "auth_session_data";
-
-        // Because the inner service can panic until ready, we need to ensure we only
-        // use the ready service.
-        //
-        // See: https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services
 
         let mut service = self.service.clone();
         Box::pin(async move {
             let Some(session) = req.extensions().get::<Session>().cloned() else {
-                tracing::error!("session not found in request extensions");
+                tracing::error!("session not found in guest extensions");
                 let mut res = Response::default();
                 *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
                 return Ok(res);
             };
 
             let auth_session = match AuthSession::from_session(session, backend.clone()).await {
-                Ok(auth_session) => auth_session,
+                Ok(auth_session) => {
+                    debug!("Created auth session from session: {:?}", auth_session);
+                    auth_session
+                }
                 Err(err) => {
                     tracing::error!(
                         err = %err,
@@ -101,8 +90,8 @@ where
                 }
             };
 
-            if let Some(ref id) = auth_session.id() {
-                tracing::info!(
+            if let Some(ref id) = auth_session.id().await {
+                info!(
                     user_id = id.to_string(),
                     "Authenticated user found in session"
                 );
@@ -110,12 +99,7 @@ where
                 tracing::warn!("No authenticated user found in session");
             }
 
-            println!("Session data in request: {:?}", &auth_session);
             req.extensions_mut().insert(auth_session);
-            println!(
-                "Inserted auth session into request extensions: {:?}",
-                req.extensions()
-            );
 
             service.call(req).await
         })
@@ -136,6 +120,10 @@ impl AsRef<Session> for AuthSessionData {
 }
 
 impl AuthSessionData {
+    pub fn is_user(&self) -> bool {
+        self.user.is_some()
+    }
+
     pub fn id(&self) -> Option<Id> {
         self.session.id()
     }
@@ -149,6 +137,7 @@ impl AuthSessionData {
     }
     pub async fn logout(&mut self) -> Result<(), String> {
         self.session.clear().await;
+        self.session.flush().await.map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -182,7 +171,7 @@ pub struct AuthBackendSqlite {
 #[derive(Clone)]
 pub struct AuthSession<Backend: AuthBackend<SqliteStore>> {
     pub backend: Backend,
-    pub inner: AuthSessionData,
+    pub inner: Arc<Mutex<AuthSessionData>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -205,7 +194,7 @@ impl AuthSession<AuthBackendSqlite> {
         let mut user = backend.get_user(data.user).await.unwrap_or_default();
 
         if let Some(ref user_auth) = user {
-            tracing::info!("User found in session: {:?}", user);
+            debug!("User found in session: {:?}", user_auth.id);
             let auth = user_auth.session_auth_hash();
             let session_verified = data
                 .auth_hash
@@ -213,7 +202,7 @@ impl AuthSession<AuthBackendSqlite> {
                 .is_some_and(|auth_hash| auth_hash == auth);
 
             if !session_verified {
-                info!("Session auth hash does not match user auth hash, resetting session data");
+                debug!("Session auth hash does not match user auth hash, resetting session data");
                 data = UserAuthData::default();
                 session.flush().await.map_err(|e| e.to_string())?;
                 user = None;
@@ -222,17 +211,18 @@ impl AuthSession<AuthBackendSqlite> {
             tracing::warn!("No user found in session");
         }
 
-        let inner = AuthSessionData {
+        let inner = Arc::new(Mutex::new(AuthSessionData {
             user,
             session,
             data: data,
-        };
+        }));
 
         Ok(AuthSession { backend, inner })
     }
 
-    pub fn id(&self) -> Option<Id> {
-        self.inner.session.id()
+    pub async fn id(&self) -> Option<Id> {
+        let inner = self.inner.lock().await;
+        inner.session.id()
     }
 
     pub fn authenticate(
@@ -243,17 +233,50 @@ impl AuthSession<AuthBackendSqlite> {
     }
 
     pub async fn login(&mut self, user: User) -> Result<(), Error> {
+        let mut inner = self.inner.lock().await;
         let auth_hash = user.session_auth_hash().to_vec();
-        self.inner.data.user = user.id.into();
-        self.inner.data.auth_hash = Some(auth_hash);
+
+        if inner.data.auth_hash.is_none() {
+            debug!("Session auth hash is None, setting it for the first time");
+            inner
+                .session
+                .cycle_id()
+                .await
+                .map_err(|_| Error::SessionNotFound)?;
+        }
+        inner.data.user = user.id.into();
+        inner.data.auth_hash = Some(auth_hash);
+        drop(inner);
 
         self.update_session().await
     }
 
-    pub async fn update_session(&mut self) -> Result<(), Error> {
-        self.inner
+    pub async fn logout(&mut self) -> Result<(), Error> {
+        let mut inner = self.inner.lock().await;
+        inner.data = UserAuthData::default();
+        inner.user = None;
+
+        inner.session.clear().await;
+
+        inner
             .session
-            .insert("data", &self.inner.data)
+            .flush()
+            .await
+            .map_err(|_| Error::SessionFlushFailed)?;
+
+        Ok(())
+    }
+
+    pub async fn is_user(&self) -> bool {
+        let inner = self.inner.lock().await;
+        inner.is_user()
+    }
+
+    pub async fn update_session(&mut self) -> Result<(), Error> {
+        let inner = self.inner.lock().await;
+        inner
+            .session
+            .insert("data", &inner.data)
             .await
             .map_err(|e| Error::SessionUpdateFailed)?;
 
@@ -279,9 +302,6 @@ impl fmt::Debug for AuthBackendSqlite {
 
 pub trait AuthBackend<T: SessionStore> {
     type Error;
-    // async fn is_authenticated(&self) -> bool;
-    // async fn user_id(&self) -> Option<i64>;
-    // async fn create_session(&mut self, user_id: i64) -> Result<(), String>;
     fn authenticate(
         &self,
         creds: Credentials,
@@ -302,23 +322,18 @@ impl AuthBackend<SqliteStore> for AuthBackendSqlite {
             .fetch_optional(&self.db)
             .await?;
 
-        // Verifying the password is blocking and potentially slow, so we'll do so via
-        // `spawn_blocking`.
         task::spawn_blocking(|| {
-            // We're using password-based authentication--this works by comparing our form
-            // input with an argon2 password hash.
             Ok(user.filter(|user| verify_password(creds.password, &user.password_hash).is_ok()))
         })
         .await?
     }
 
     async fn get_user(&self, user_id: i64) -> Result<Option<User>, Self::Error> {
-        info!("Fetching user with ID: {}", user_id);
+        debug!("Fetching user with ID: {}", user_id);
         let user = sqlx::query_as("select * from users where id = ?")
             .bind(user_id.to_string())
             .fetch_optional(&self.db)
             .await?;
-        info!("Fetched user: {:?}", user);
 
         Ok(user)
     }
@@ -331,4 +346,157 @@ pub fn verify_password(password: impl AsRef<[u8]>, hash: &str) -> Result<(), Err
     parsed_hash
         .verify_password(verifier, password.as_ref())
         .map_err(|_| Error::PasswordVerificationFailed)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Arc, time::Duration};
+
+    use chrono::Utc;
+    use reqwest::{
+        Client, StatusCode, Url,
+        cookie::{CookieStore, Jar},
+    };
+
+    use crate::shared::test_utils::setup_test_app;
+
+    #[tokio::test]
+    async fn test1() {
+        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        let res = client.get(url("/", &address)).send().await.unwrap();
+        assert_eq!(
+            *res.url(),
+            url("/login?next=%2F", &address),
+            "Expected redirect to /login after accessing root without authentication"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Log in with invalid credentials.
+        let res = login(&client, "ferris", "bogus", &address).await;
+        assert_eq!(
+            *res.url(),
+            url("/login", &address),
+            "Expected redirect to /login after failed login"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+        // assert!(
+        //     cookie_jar.cookies(&url("/"), &a).is_some(),
+        //     "Expected cookies (i.e. for flash messages)"
+        // );
+
+        let res = login(&client, "ferris", "hunter42", &address).await;
+        assert_eq!(
+            *res.url(),
+            url("/", &address),
+            "Expected redirect to / after successful login"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let cookies = cookie_jar
+            .cookies(&url("/", &address))
+            .expect("A cookie should be set");
+        assert!(
+            cookies.to_str().unwrap_or("").contains("id="),
+            "Expected 'id' cookie to be set after successful login"
+        );
+
+        let res = client.get(url("/logout", &address)).send().await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            cookie_jar.cookies(&url("/", &address)).iter().len(),
+            0,
+            "Expected 'id' cookie to be removed"
+        );
+    }
+
+    #[tokio::test]
+    async fn logout_is_idempotent() {
+        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+        login(&client, "ferris", "hunter42", &address).await;
+
+        // Logout twice
+        let res1 = client.get(url("/logout", &address)).send().await.unwrap();
+        let res2 = client.get(url("/logout", &address)).send().await.unwrap();
+
+        // Both should succeed without errors
+        assert_eq!(res1.status(), StatusCode::OK);
+        assert_eq!(res2.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn expires_inactive_sessions() {
+        let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        let _ = login(&client, "ferris", "hunter42", &address).await;
+
+        let id = cookie_jar
+            .cookies(&url("/", &address))
+            .expect("A cookie should be set")
+            .to_str()
+            .expect("Cookie should be valid")
+            .split_terminator("=")
+            .last()
+            .expect("Expected 'id' cookie to be set")
+            .to_string();
+
+        sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
+            .bind(Utc::now().timestamp() - 1)
+            .bind(&id)
+            .execute(&db_pool)
+            .await
+            .unwrap();
+
+        let res = client
+            .get(url("/protected", &address))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
+    }
+
+    fn url(path: &str, base_address: &str) -> Url {
+        let formatted_url = if path.starts_with('/') {
+            format!("{base_address}{path}")
+        } else {
+            format!("{base_address}/{path}")
+        };
+        formatted_url.parse().unwrap()
+    }
+
+    async fn login(
+        client: &Client,
+        username: &str,
+        password: &str,
+        base_address: &str,
+    ) -> reqwest::Response {
+        let mut form = HashMap::new();
+        form.insert("username", username);
+        form.insert("password", password);
+        client
+            .post(url("/login", base_address))
+            .form(&form)
+            .send()
+            .await
+            .unwrap()
+    }
 }
