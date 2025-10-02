@@ -106,7 +106,7 @@ jobs:
         with:
           toolchain: stable
       - name: cargo install cargo-hack
-        uses: taiki-e/install-action@0eee80d37f55e834144deec670972c19e81a85b0 # tag=v2.56.0
+        uses: taiki-e/install-action@7fe7b8c79a3c5569643cf27dfc32456883a4cd4d # tag=v2.62.16
         with:
           tool: cargo-hack
       # intentionally no target specifier; see https://github.com/jonhoo/rust-ci-conf/pull/4
