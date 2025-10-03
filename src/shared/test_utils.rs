@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
-    password_hash::{SaltString, rand_core::OsRng},
 };
 use axum::extract::FromRef;
 use std::{net::Ipv4Addr, sync::Once};
@@ -10,7 +10,7 @@ use std::{net::Ipv4Addr, sync::Once};
 use chrono::DateTime;
 use sqlx::{Executor, Pool, Sqlite};
 
-use crate::{app::AppBuilder, shared::error::Error, users::users::User};
+use crate::{app::AppBuilder, models::users::User, shared::error::Error};
 
 static INIT: Once = Once::new();
 

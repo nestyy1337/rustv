@@ -4,8 +4,7 @@ use backend::{
     app::AppBuilder,
     shared::{args::InputArgs, config::SETTINGS},
 };
-use clap::{Args, Parser};
-use tracing::{debug, info, trace};
+use clap::Parser;
 
 #[tokio::main]
 async fn main() {
@@ -28,6 +27,6 @@ async fn main() {
         .await
         .expect("socket must be broken or port taken");
 
-    info!("Server is running at: {}", app.local_address().unwrap());
+    tracing::info!("Server is running at: {}", app.local_address().unwrap());
     app.run(db_pool).await.expect("main future resolved");
 }

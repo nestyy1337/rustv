@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
-    password_hash::{SaltString, rand_core::OsRng},
 };
 
 use askama::Template;
 use axum::{
-    Form, Router,
     extract::Query,
     http::{Response, StatusCode},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
+    Form, Router,
 };
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -19,17 +19,16 @@ use tower_sessions_sqlx_store::SqliteStore;
 
 use crate::{
     app::AppState,
+    models::users::User,
     shared::{
         error::Error,
         middleware::{AuthBackend, AuthBackendSqlite, AuthLayer, AuthSessionData},
     },
-    users::users::User,
 };
 
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct LoginTemplate {
-    lang: String,
     next: Option<String>,
 }
 
@@ -72,23 +71,23 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/login", post(self::post::login))
         .route("/login", get(self::get::login))
-        // .route("/register", post(self::post::register))
+        .route("/register", post(self::post::register))
         .route("/register", get(self::get::register))
         .route("/logout", get(self::get::logout))
 }
 
 mod post {
-    use crate::shared::middleware::{AuthBackendSqlite, AuthSession};
+    use crate::{
+        models::users::Credentials,
+        shared::middleware::{AuthBackendSqlite, AuthSession},
+    };
     use std::sync::Arc;
 
     use axum::extract::State;
     use tower_sessions::Session;
     use tracing::{info, warn};
 
-    use crate::{
-        shared::{error::Error, middleware::AuthSessionData},
-        users::users::{Credentials, User},
-    };
+    use crate::shared::{error::Error, middleware::AuthSessionData};
 
     use super::*;
 
@@ -192,14 +191,7 @@ mod get {
     use super::*;
 
     pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> Html<String> {
-        Html(
-            LoginTemplate {
-                next,
-                lang: "en".to_string(),
-            }
-            .render()
-            .unwrap(),
-        )
+        Html(LoginTemplate { next }.render().unwrap())
     }
 
     pub async fn register(Query(NextUrl { next }): Query<NextUrl>) -> Html<String> {

@@ -1,66 +1,78 @@
 use anyhow::Result;
+use askama::Template;
 use axum::extract::Request;
 use axum::http::StatusCode;
-use axum::middleware::{FromFnLayer, Next, from_fn};
-use axum::response::{IntoResponse, Redirect, Response};
-use axum::routing::Route;
+use axum::middleware::{from_fn, FromFnLayer, Next};
+use axum::response::{Html, IntoResponse, Redirect, Response};
+use axum::routing::{delete, Route};
 use axum::{debug_handler, middleware};
 use axum_messages::MessagesManagerLayer;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Executor, Pool, prelude::FromRow};
+use sqlx::{prelude::FromRow, Executor, Pool};
 use std::{marker::PhantomData, net::Ipv4Addr, sync::Arc};
+use time::OffsetDateTime;
 use tower::Layer;
 use tower_http::trace::TraceLayer;
-use tower_sessions::{ExpiredDeletion, Session, SessionStore, cookie};
-use tower_sessions::{Expiry, SessionManagerLayer, cookie::time::Duration};
-use tower_sessions_sqlx_store::{SqliteStore, sqlx::SqlitePool};
+use tower_sessions::{cookie, ExpiredDeletion, Session, SessionStore};
+use tower_sessions::{cookie::time::Duration, Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::{sqlx::SqlitePool, SqliteStore};
 use tracing::info;
 
-use axum::{Router, extract::State, routing::get};
+use axum::{extract::State, routing::get, Router};
 use tokio::net::TcpListener;
 
 use crate::auth;
+use crate::handlers::movies::{
+    get_movie_details, get_watched_movies_page, handle_delete_watchlisted_movie,
+};
+use crate::handlers::profile::get_profile_page;
+use crate::handlers::watchlist::get_watchlist_page;
+use crate::models::movie::Movie;
+use crate::models::users::UserProfile;
+use crate::repositories::users::UserProfileRepository;
 use crate::shared::logging::{
     trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
 };
 use crate::shared::middleware::{
     AuthBackend, AuthBackendSqlite, AuthLayer, AuthSession, AuthSessionData, UserAuthData,
 };
-use crate::users::users::User;
+use crate::views::pages::FrontPageData;
 
-async fn prot(
-    State(state): State<Arc<AppState>>,
-    mut session: AuthSession<AuthBackendSqlite>,
-) -> &'static str {
-    let x = sqlx::query_as::<_, User>("SELECT * FROM users LIMIT 1")
-        .fetch_one(&state.pool)
-        .await
-        .expect("Failed to fetch user from database");
-    info!("Fetched user: {:?}", x);
-    "Hello, World!"
-}
-
-#[debug_handler]
 async fn root(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     mut session: AuthSession<AuthBackendSqlite>,
-) -> &'static str {
-    info!("Handling root request");
-    // if let Some(user) = session.session.user_id().await {
-    //     info!("User is logged in: {:?}", user);
-    // } else {
-    //     info!("User is not logged in");
-    // }
-    //
-    println!("Session data at root handler: {:?}", session);
+) -> impl IntoResponse {
+    let user_id = if session.is_user().await {
+        session.inner.lock().await.user_id()
+    } else {
+        None
+    };
+    let movies = vec![Movie {
+        id: 1,
+        title: "Example Movie".to_string(),
+        director: "Jane Doe".to_string(),
+        release_year: 2023,
+        genre: "Drama".to_string(),
+        created_at: Some(OffsetDateTime::now_utc()),
+        updated_at: Some(OffsetDateTime::now_utc()),
+    }];
 
-    let x = sqlx::query_as::<_, User>("SELECT * FROM users LIMIT 1")
-        .fetch_one(&state.pool)
-        .await
-        .expect("Failed to fetch user from database");
-    info!("Fetched user: {:?}", x);
-    "Hello, World!"
+    let user_data = if let Some(uid) = user_id {
+        match UserProfileRepository::from_user_id(&_state.pool, uid as i64).await {
+            Ok(profile) => profile,
+            Err(e) => {
+                info!("Failed to fetch user profile: {:?}", e);
+                UserProfile::default()
+            }
+        }
+    } else {
+        UserProfile::default()
+    };
+
+    let data = FrontPageData::new(user_data, movies);
+
+    Html(data.render().unwrap())
 }
 
 pub struct AddressNotSet;
@@ -236,7 +248,6 @@ impl App {
         let auth_layer = AuthLayer { db: pool.clone() };
 
         let protected_route = Router::new()
-            .route("/protected", get(prot))
             .route("/", get(root))
             .route_layer(from_fn(require_auth_redirect));
 
@@ -254,6 +265,14 @@ impl App {
             .route("/test", get(root))
             .merge(protected_route)
             .merge(auth::login::router())
+            .route("/profile/{username}", get(get_profile_page))
+            .route("/movies/{movie_id}", get(get_movie_details))
+            .route("/watchlist/{username}", get(get_watchlist_page))
+            .route("/watched/{username}", get(get_watched_movies_page))
+            .route(
+                "/watchlist/movie/{movie_id}",
+                delete(handle_delete_watchlisted_movie),
+            )
             .with_state(Arc::new(AppState::new(pool)))
             .layer(auth_layer)
             .layer(session_layer)
@@ -289,7 +308,7 @@ pub async fn shutdown_signal() {
 
 #[cfg(unix)]
 pub async fn terminate() {
-    use tokio::signal::unix::{SignalKind, signal};
+    use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigterm = signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal");
     sigterm.recv().await;

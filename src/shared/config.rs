@@ -18,10 +18,16 @@ pub struct DatabaseSettings {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiKeys {
+    pub tmdb: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
+    pub apikeys: ApiKeys,
 }
 
 enum Environment {

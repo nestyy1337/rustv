@@ -5,19 +5,19 @@ use argon2::{self, PasswordHash, PasswordVerifier};
 
 use axum::{
     extract::{FromRequestParts, Request},
-    http::{self, Response, StatusCode, request::Parts},
+    http::{self, request::Parts, Response, StatusCode},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tokio::{sync::Mutex, task};
 use tower::{Layer, Service};
-use tower_sessions::{Session, SessionStore, session::Id};
+use tower_sessions::{session::Id, Session, SessionStore};
 use tower_sessions_sqlx_store::SqliteStore;
-use tracing::{Instrument, debug, info};
+use tracing::{debug, info, Instrument};
 
 use crate::{
+    models::users::{Credentials, User},
     shared::error::Error,
-    users::users::{Credentials, User},
 };
 
 #[derive(Clone, Debug)]
@@ -126,6 +126,10 @@ impl AsRef<Session> for AuthSessionData {
 impl AuthSessionData {
     pub fn is_user(&self) -> bool {
         self.user.is_some()
+    }
+
+    pub fn user_id(&self) -> Option<i64> {
+        self.user.as_ref().map(|u| u.id)
     }
 
     pub fn id(&self) -> Option<Id> {
@@ -361,8 +365,8 @@ mod tests {
 
     use chrono::Utc;
     use reqwest::{
-        Client, StatusCode, Url,
         cookie::{CookieStore, Jar},
+        Client, StatusCode, Url,
     };
 
     use crate::shared::test_utils::setup_test_app;

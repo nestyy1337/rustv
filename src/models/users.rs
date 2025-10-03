@@ -1,10 +1,43 @@
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::prelude::FromRow;
-
-use argon2::{Argon2, PasswordVerifier, password_hash::PasswordHash};
+use sqlx::{prelude::FromRow, Pool, Sqlite};
 
 use crate::shared::error::Error;
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct UserProfile {
+    pub id: i64,
+    pub username: String,
+    pub display_name: String,
+    pub watchlist_count: i64,
+    pub watched_count: i64,
+    pub reviews_count: i64,
+}
+
+impl Default for UserProfile {
+    fn default() -> Self {
+        UserProfile {
+            id: 0,
+            username: "guest".to_string(),
+            display_name: "Guest".to_string(),
+            watchlist_count: 0,
+            watched_count: 0,
+            reviews_count: 0,
+        }
+    }
+}
+
+impl UserProfile {
+    pub fn initials(&self) -> String {
+        self.display_name
+            .split_whitespace()
+            .filter_map(|w| w.chars().next())
+            .take(2)
+            .collect::<String>()
+            .to_uppercase()
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -56,18 +89,6 @@ impl User {
         self.id
     }
 }
-
-// impl AuthUser for User {
-//     type Id = i64;
-//
-//     fn id(&self) -> Self::Id {
-//         self.id
-//     }
-//
-//     fn session_auth_hash(&self) -> &[u8] {
-//         self.password_hash.as_bytes()
-//     }
-// }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Credentials {

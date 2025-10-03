@@ -1,0 +1,161 @@
+{% extends "_layout.html" %}
+{% block title %}Frontpage{% endblock %}
+{% block page_title %}Movies & Entertainment{% endblock %}
+{% block page_description %}Discover your next favorite movie{% endblock %}
+
+{%- block content -%}
+<div class="w-full -m-6">
+  <div class="flex flex-col lg:flex-row gap-6 p-6">
+
+    <!-- Left column -->
+    <div class="lg:w-[70%] w-full">
+      <div class="glass rounded-xl p-6">
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-dark-text-primary">Available Movies</h2>
+          <div class="flex gap-2">
+            <button class="px-4 py-2 text-sm text-dark-text-secondary hover:text-primary-400 transition-colors">Grid View</button>
+            <button class="px-4 py-2 text-sm text-dark-text-secondary hover:text-primary-400 transition-colors">List View</button>
+          </div>
+        </div>
+
+        <!-- Movies Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <!-- Example cards -->
+          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+            <div class="aspect-[2/3] bg-gradient-to-br from-primary-600 to-accent-purple"></div>
+            <div class="p-4">
+              <h3 class="font-semibold text-dark-text-primary mb-1">Movie Title</h3>
+              <p class="text-sm text-dark-text-secondary">2024 • Action</p>
+              <div class="flex items-center mt-2">
+                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">8.5</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+            <div class="aspect-[2/3] bg-gradient-to-br from-accent-cyan to-accent-emerald"></div>
+            <div class="p-4">
+              <h3 class="font-semibold text-dark-text-primary mb-1">Another Movie</h3>
+              <p class="text-sm text-dark-text-secondary">2024 • Drama</p>
+              <div class="flex items-center mt-2">
+                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">7.9</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+            <div class="aspect-[2/3] bg-gradient-to-br from-accent-rose to-accent-purple"></div>
+            <div class="p-4">
+              <h3 class="font-semibold text-dark-text-primary mb-1">Featured Film</h3>
+              <p class="text-sm text-dark-text-secondary">2024 • Thriller</p>
+              <div class="flex items-center mt-2">
+                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">9.1</span>
+              </div>
+            </div>
+          </div>
+
+          {% for movie in movies %}
+          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+            <div class="aspect-[2/3] bg-dark-hover"></div>
+            <div class="p-4">
+              <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
+              <div class="text-sm text-dark-text-secondary">
+                {{ movie.release_year }} •
+                {{ movie.genre }} •
+              </div>
+              <div class="flex items-center mt-2">
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center mt-8 gap-2">
+          <button class="px-3 py-1 rounded-lg bg-dark-surface text-dark-text-secondary hover:bg-dark-hover">Previous</button>
+          <button class="px-3 py-1 rounded-lg bg-primary-600 text-white">1</button>
+          <button class="px-3 py-1 rounded-lg bg-dark-surface text-dark-text-secondary hover:bg-dark-hover">2</button>
+          <button class="px-3 py-1 rounded-lg bg-dark-surface text-dark-text-secondary hover:bg-dark-hover">3</button>
+          <button class="px-3 py-1 rounded-lg bg-dark-surface text-dark-text-secondary hover:bg-dark-hover">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="lg:w-[30%] w-full space-y-6">
+
+      <!-- User Profile Section (wrapped correctly) -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Profile</h3>
+
+          <div class="flex items-center space-x-4 mb-4">
+            <div class="h-12 w-12 rounded-full bg-gradient-to-r from-primary-400 to-accent-purple flex items-center justify-center">
+
+              <span class="text-white font-bold text-lg" aria-hidden="true">👤</span>
+            </div>
+            <div>
+              <p class="font-medium text-dark-text-primary">{{ user_profile.display_name }}</p>
+              <p class="text-sm text-dark-text-secondary">
+                {% if user_profile.watchlist_count > 50 %}Premium Member{% else %}Member{% endif %}
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-4 border-t border-dark-border">
+            <div class="flex justify-between text-sm">
+              <span class="text-dark-text-secondary">Watch List</span>
+              <span class="text-primary-400">{{ user_profile.watchlist_count }} movies</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-dark-text-secondary">Watched</span>
+              <span class="text-primary-400">{{ user_profile.watched_count }} movies</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-dark-text-secondary">Reviews</span>
+              <span class="text-primary-400">{{ user_profile.reviews_count }}</span>
+            </div>
+          </div>
+
+        <a href="/profile/{{ user_profile.username }}" class="w-full mt-4 btn-primary text-white font-medium py-2 px-4 rounded-lg inline-block text-center">
+          View Profile
+        </a>
+      </div>
+
+      <!-- Categories Section -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Categories</h3>
+        <div class="space-y-2">
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Action</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">245</span>
+          </button>
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Comedy</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">189</span>
+          </button>
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Drama</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">324</span>
+          </button>
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Sci-Fi</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">127</span>
+          </button>
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Horror</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">98</span>
+          </button>
+          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Romance</span>
+            <span class="text-dark-text-muted group-hover:text-primary-400">156</span>
+          </button>
+        </div>
+        <button class="w-full mt-4 text-primary-400 text-sm font-medium hover:text-primary-300">View All Categories →</button>
+      </div>
+
+    </div> <!-- end right column -->
+
+  </div> <!-- end flex container -->
+</div> <!-- end wrapper -->
+{%- endblock -%}

@@ -1,67 +1,277 @@
-{#-
-    This is the basic layout of our example application.
-    It is the core skeleton shared between all pages.
-    It expects the struct of any template that `{% extends %}` this layout to contain
-    (at least) a field `lang: Lang`, so it can be used in the `<html lang=` attribute.
--#}
-
 <!DOCTYPE html>
-<html lang="{{lang}}">
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
-        {#-
-            A base template can contain `blocks`, which my be overridden templates that use
-            this base template. A block may contain a default content, if the extending
-            template does want to / need to override the content of a block.
-
-            E.g. maybe you would like to have "Askama example application" as default title for
-            your pages, then simply add this text (without quotation marks) in the block!
-
-            The default content can be as complex as you need it to be.
-            E.g. it may contain any nodes like `{% if … %}`, and even other blocks.
-        ~#}
-        <title>{% block title %}{% endblock %}</title>
-
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{% block title %}RustTV{% endblock %}</title>
+        <!-- Cache Control -->
         <meta http-equiv="expires" content="Sat, 01 Dec 2001 00:00:00 GMT" />
         <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
         <meta http-equiv="pragma" content="no-cache" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
-
-        {#-
-            In a real application you most likely would want to link style sheets,
-            any JavaScripts etc. using e.g. `actix-files`, instead of embedding the content
-            in your generated HTML.
-
-            As you can see, this comment starts with `-`, which will tells the comment
-            to strip all white spaces before it, until it finds the first non-white space
-            character, a `>`.
-
-            The comment is also terminated with `~`. This also strips white spaces, but
-            will leave one space, or a newline character, if the stripped content contained
-            a newline.
-        ~#}
+        <!-- Tailwind CSS CDN -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <!-- Tailwind Configuration -->
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            // Primary brand colors
+                            primary: {
+                                50: '#eef2ff',
+                                100: '#e0e7ff',
+                                200: '#c7d2fe',
+                                300: '#a5b4fc',
+                                400: '#818cf8',
+                                500: '#6366f1',
+                                600: '#4f46e5',
+                                700: '#4338ca',
+                                800: '#3730a3',
+                                900: '#312e81',
+                            },
+                            // Dark mode specific colors
+                            dark: {
+                                bg: '#0f0f11',
+                                surface: '#1a1a1e',
+                                hover: '#242429',
+                                border: '#2e2e35',
+                                text: {
+                                    primary: '#f0f0f5',
+                                    secondary: '#a8a8b3',
+                                    muted: '#6e6e7a',
+                                }
+                            },
+                            // Accent colors
+                            accent: {
+                                purple: '#9333ea',
+                                cyan: '#06b6d4',
+                                emerald: '#10b981',
+                                rose: '#f43f5e',
+                            }
+                        },
+                        fontFamily: {
+                            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        },
+                        animation: {
+                            'gradient': 'gradient 8s ease infinite',
+                            'glow': 'glow 2s ease-in-out infinite alternate',
+                        },
+                        keyframes: {
+                            gradient: {
+                                '0%, 100%': {
+                                    'background-size': '200% 200%',
+                                    'background-position': 'left center'
+                                },
+                                '50%': {
+                                    'background-size': '200% 200%',
+                                    'background-position': 'right center'
+                                }
+                            },
+                            glow: {
+                                'from': {
+                                    'box-shadow': '0 0 10px rgba(99, 102, 241, 0.3), 0 0 20px rgba(99, 102, 241, 0.2)',
+                                },
+                                'to': {
+                                    'box-shadow': '0 0 20px rgba(99, 102, 241, 0.4), 0 0 30px rgba(99, 102, 241, 0.3)',
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        </script>
+        <!-- Custom CSS -->
         <style>
         /*<![CDATA[*/
-            {%~ include "_layout.css" ~%}
+            /* Import Google Font */
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+            /* Custom scrollbar for dark theme */
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: #1a1a1e;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: #4338ca;
+                border-radius: 5px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #6366f1;
+            }
+
+            /* Smooth transitions for theme elements */
+            * {
+                transition: background-color 0.2s ease, border-color 0.2s ease;
+            }
+
+            /* Gradient text effect */
+            .gradient-text {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            /* Animated gradient background */
+            .animated-gradient {
+                background: linear-gradient(-45deg, #4338ca, #6366f1, #818cf8, #a5b4fc);
+                background-size: 400% 400%;
+                animation: gradient 15s ease infinite;
+            }
+
+            /* Glass morphism effect */
+            .glass {
+                background: rgba(26, 26, 30, 0.7);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            /* Hover effects for interactive elements */
+            .hover-lift {
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .hover-lift:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+            }
+
+            /* Subtle glow for focused elements */
+            .focus-glow:focus {
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+            }
+
+            /* Custom button styles */
+            .btn-primary {
+                background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+                transition: all 0.3s ease;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 7px 14px rgba(99, 102, 241, 0.4);
+            }
+
+            /* Loading spinner */
+            .spinner {
+                border: 3px solid rgba(99, 102, 241, 0.1);
+                border-radius: 50%;
+                border-top: 3px solid #6366f1;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+             /* {%~ include "_layout.css" ~%} */
+            {% block extra_css %}{% endblock %}
         /*]]>*/
         </style>
     </head>
-    <body>
-        {%~ block content %}{% endblock ~%}
+    <body class="min-h-screen flex flex-col bg-dark-bg text-dark-text-primary">
+        <!-- Optional Navigation Bar -->
+        <nav class="glass sticky top-0 z-50 border-b border-dark-border">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo/Brand -->
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <h1 class="text-xl font-bold gradient-text">RustTV</h1>
+                        </div>
+                        <!-- Navigation Links -->
+                        <div class="hidden md:block ml-10">
+                            <div class="flex items-baseline space-x-4">
+                                <a href="#" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Dashboard</a>
+                                <a href="#" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Projects</a>
+                                <a href="#" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Team</a>
+                                <a href="#" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Reports</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right side items -->
+                    <div class="flex items-center space-x-4">
+                        <!-- Notification icon -->
+                        <button class="text-dark-text-secondary hover:text-primary-400 p-2 rounded-lg hover:bg-dark-hover transition-colors">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                        </button>
+                        <!-- User avatar -->
+                        <div class="relative">
+                            <button class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-bg focus:ring-primary-500">
+                                <div class="h-8 w-8 rounded-full bg-gradient-to-r from-primary-400 to-accent-purple flex items-center justify-center">
+                                    <span class="text-white font-medium">U</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-grow">
+        {% block main_container %}
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <!-- Page Header (optional) -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-dark-text-primary mb-2">{% block page_title %}Welcome{% endblock %}</h2>
+                    <p class="text-dark-text-secondary">{% block page_description %}Build something amazing today{% endblock %}</p>
+                </div>
+
+             {%~ block content %}
+                    <!-- Default content with glass -->
+                    <div class="glass rounded-xl p-6 shadow-2xl">
+                        <div class="text-center py-12">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20 mb-4">
+                                <svg class="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold text-dark-text-primary mb-2">Ready to Start</h3>
+                            <p class="text-dark-text-secondary mb-6">Your content goes here</p>
+                            <button class="btn-primary text-white font-medium py-2 px-6 rounded-lg hover-lift">
+                                Get Started
+                            </button>
+                        </div>
+                    </div>
+                    {% endblock ~%}
+                </div>
+            {% endblock ~%}
+        </main>
+
+        {% block footer %}
+            {%~ include "_footer.html" ~%}
+        {% endblock %}
+
+
+        <!-- JavaScript -->
+        <script>
+            // Optional: Add dark mode toggle functionality
+            function toggleDarkMode() {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            }
+
+            // Check for saved dark mode preference or default to dark
+            if (localStorage.getItem('darkMode') === 'true' || !('darkMode' in localStorage)) {
+                document.documentElement.classList.add('dark');
+            }
+        </script>
+        {% block extra_js %}{% endblock %}
     </body>
 </html>
-
-{%- macro lang_select(page, query="") -%}
-    <ul id="lang-select">
-        {%- if lang != Lang::en -%}
-            <li><a href="/en/{{ page }}.html{{ query }}">This page in English</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::de -%}
-            <li><a href="/de/{{ page }}.html{{ query }}">Diese Seite auf deutsch.</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::fr -%}
-            <li><a href="/fr/{{ page }}.html{{ query }}">Cette page est en français.</a></li>
-        {%- endif -%}
-    </ul>
-{%- endmacro lang_select -%}

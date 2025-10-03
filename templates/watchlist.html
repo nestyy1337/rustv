@@ -1,0 +1,201 @@
+{% extends "_layout.html" %}
+
+{% block title %}My Watchlist - RustTV{% endblock %}
+{% block page_title %}My Watchlist{% endblock %}
+{% block page_description %}Movies you want to watch{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    {% for watchlist_item in watchlist %}
+    <div class="movie-card glass rounded-xl p-6 hover-lift" data-movie-id="{{ watchlist_item.movie_id }}">
+        <!-- Loading state -->
+        <div class="loading-state">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-dark-text-secondary text-center">Loading movie...</p>
+        </div>
+
+        <!-- Movie content (hidden initially) -->
+        <div class="movie-content hidden">
+            <div class="mb-4">
+                <h3 class="movie-title text-xl font-bold text-dark-text-primary mb-2"></h3>
+                <p class="movie-director text-dark-text-secondary text-sm mb-3"></p>
+            </div>
+
+            <div class="flex items-center justify-between mb-4">
+                <span class="movie-year text-dark-text-muted text-sm font-medium"></span>
+                <span class="movie-genre inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary-500/20 text-primary-400"></span>
+            </div>
+
+            <div class="flex gap-2 mt-4">
+                <button class="remove-btn flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-medium py-2 px-4 rounded-lg transition-all duration-200 text-sm">
+                    Remove
+                </button>
+                <button class="watch-btn flex-1 btn-primary text-white font-medium py-2 px-4 rounded-lg text-sm">
+                    Watch Now
+                </button>
+            </div>
+        </div>
+
+        <!-- Error state (hidden initially) -->
+        <div class="error-state hidden">
+            <div class="text-center">
+                <svg class="w-12 h-12 text-red-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-red-400 text-sm">Failed to load movie</p>
+                <button class="retry-btn mt-3 text-primary-400 hover:text-primary-300 text-sm font-medium">
+                    Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Empty state if no movies in watchlist -->
+{% if watchlist.is_empty() %}
+<div class="glass rounded-xl p-12 text-center">
+    <svg class="w-16 h-16 text-dark-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M5 12h14M5 16h14"></path>
+    </svg>
+    <h3 class="text-xl font-semibold text-dark-text-primary mb-2">Your watchlist is empty</h3>
+    <p class="text-dark-text-secondary mb-6">Start adding movies you want to watch!</p>
+    <a href="/movies" class="inline-block btn-primary text-white font-medium py-2 px-6 rounded-lg hover-lift">
+        Browse Movies
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to format the timestamp array into a readable date
+    function formatDate(timestampArray) {
+        if (!timestampArray || timestampArray.length < 3) return '';
+        const [year, dayOfYear, ...time] = timestampArray;
+        // This is a simplified version - you might want to properly convert day of year
+        return `${year}`;
+    }
+
+    // Function to load movie details
+    async function loadMovieDetails(card) {
+        const movieId = card.dataset.movieId;
+        const loadingState = card.querySelector('.loading-state');
+        const movieContent = card.querySelector('.movie-content');
+        const errorState = card.querySelector('.error-state');
+
+        try {
+            const response = await fetch(`/movies/${movieId}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch movie');
+            }
+
+            const movie = await response.json();
+
+            // Populate movie data
+            card.querySelector('.movie-title').textContent = movie.title;
+            card.querySelector('.movie-director').textContent = `Directed by ${movie.director}`;
+            card.querySelector('.movie-year').textContent = movie.release_year;
+            card.querySelector('.movie-genre').textContent = movie.genre;
+
+            // Hide loading, show content
+            loadingState.classList.add('hidden');
+            movieContent.classList.remove('hidden');
+
+        } catch (error) {
+            console.error(`Error loading movie ${movieId}:`, error);
+
+            // Hide loading, show error
+            loadingState.classList.add('hidden');
+            errorState.classList.remove('hidden');
+        }
+    }
+
+    // Load all movie cards
+    const movieCards = document.querySelectorAll('.movie-card');
+    movieCards.forEach(card => {
+        loadMovieDetails(card);
+
+        // Retry button functionality
+        const retryBtn = card.querySelector('.retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                card.querySelector('.error-state').classList.add('hidden');
+                card.querySelector('.loading-state').classList.remove('hidden');
+                loadMovieDetails(card);
+            });
+        }
+
+        // Remove button functionality
+        const removeBtn = card.querySelector('.remove-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', async () => {
+                const movieId = card.dataset.movieId;
+
+                if (confirm('Remove this movie from your watchlist?')) {
+                    try {
+                        const response = await fetch(`/watchlist/movie/${movieId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+
+                        if (response.ok) {
+                            // Animate and remove card
+                            card.style.transition = 'all 0.3s ease';
+                            card.style.opacity = '0';
+                            card.style.transform = 'scale(0.9)';
+                            setTimeout(() => {
+                                card.remove();
+
+                                // Check if watchlist is now empty
+                                if (document.querySelectorAll('.movie-card').length === 0) {
+                                    location.reload(); // Reload to show empty state
+                                }
+                            }, 300);
+                        } else {
+                            alert('Failed to remove movie from watchlist');
+                        }
+                    } catch (error) {
+                        console.error('Error removing movie:', error);
+                        alert('Error removing movie from watchlist');
+                    }
+                }
+            });
+        }
+
+        // Watch button functionality
+        const watchBtn = card.querySelector('.watch-btn');
+        if (watchBtn) {
+            watchBtn.addEventListener('click', () => {
+                const movieId = card.dataset.movieId;
+                // Navigate to movie player or details page
+                window.location.href = `/watch/${movieId}`;
+            });
+        }
+    });
+
+    // Optional: Implement lazy loading for better performance
+    if ('IntersectionObserver' in window) {
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const card = entry.target;
+                    if (!card.classList.contains('loaded')) {
+                        loadMovieDetails(card);
+                        card.classList.add('loaded');
+                        observer.unobserve(card);
+                    }
+                }
+            });
+        });
+
+        // Uncomment to enable lazy loading
+        // movieCards.forEach(card => imageObserver.observe(card));
+    }
+});
+</script>
+{% endblock %}
