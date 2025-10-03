@@ -2,8 +2,10 @@ use askama::Template;
 use std::sync::Arc;
 
 use axum::{
+    body::Body,
     extract::{Path, State},
-    response::Html,
+    http::{HeaderMap, Response},
+    response::{Html, IntoResponse},
     Json,
 };
 use reqwest::StatusCode;
@@ -15,7 +17,11 @@ use crate::{
         movies::MovieRepository,
         users::{UserProfileRepository, UserRepository},
     },
-    services::watchlist::WatchlistService,
+    services::{
+        movies::MovieService,
+        streaming::{parse_range_header, StreamingService},
+        watchlist::WatchlistService,
+    },
     shared::{
         error::Error,
         middleware::{AuthBackendSqlite, AuthSession},
@@ -155,4 +161,66 @@ pub async fn get_watched_movies_page(
     })?;
 
     Ok(Html(rendered))
+}
+
+pub async fn stream_video(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(movie_id): Path<i64>,
+    // session: AuthSession<AuthBackendSqlite>,
+) -> Result<impl IntoResponse, Error> {
+    // let session_guard = session.inner.lock().await;
+    // let _authenticated_user_id = session_guard
+    //     .user_id()
+    //     .ok_or(Error::Status(axum::http::StatusCode::UNAUTHORIZED))?;
+    // drop(session_guard);
+
+    tracing::info!("Received request to stream movie ID: {}", movie_id);
+    let file_size = StreamingService::file_size(&state.pool, movie_id).await?;
+    tracing::info!("File size for movie ID {}: {}", movie_id, file_size);
+
+    let raw_range = headers
+        .get("Range")
+        .ok_or(Error::MissingRange)?
+        .to_str()
+        .map_err(|e| {
+            tracing::error!("Invalid Range header: {}", e);
+            Error::InvalidRange
+        })?;
+    let range_header = parse_range_header(raw_range, file_size).await;
+    let range_header = match range_header {
+        Ok(range) => range,
+        Err(e) => {
+            tracing::error!("Error parsing Range header: {}", e);
+            return Err(e);
+        }
+    };
+
+    tracing::info!(
+        "Parsed Range header for movie ID {}: {:?}",
+        movie_id,
+        range_header
+    );
+
+    let stream =
+        StreamingService::stream_video(movie_id, range_header.unwrap(), &state.pool).await?;
+    tracing::info!(
+        "Streaming movie ID {}: bytes {}-{} of {}",
+        movie_id,
+        stream.start,
+        stream.end,
+        stream.file_size
+    );
+    let body = Body::from_stream(stream.stream);
+
+    Response::builder()
+        .status(206)
+        .header("Content-Type", "video/mp4")
+        .header("Content-Length", stream.content_length.to_string())
+        .header("Accept-Ranges", "bytes")
+        .body(body)
+        .map_err(|e| {
+            tracing::error!("Failed to build response: {}", e);
+            Error::TokioIoError(std::io::Error::new(std::io::ErrorKind::Other, e))
+        })
 }

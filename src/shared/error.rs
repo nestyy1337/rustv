@@ -39,6 +39,16 @@ pub enum Error {
     DatabaseError(#[from] sqlx::Error),
     #[error("reqwest error")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("movie not found")]
+    MovieNotFound,
+    #[error("tokio io error")]
+    TokioIoError(#[from] std::io::Error),
+    #[error("invalid movie range")]
+    InvalidRange,
+    #[error("missing movie range")]
+    MissingRange,
+    #[error("generic error: {0}")]
+    Generic(String),
 }
 
 impl axum::response::IntoResponse for Error {

@@ -19,7 +19,7 @@ use tokio::net::TcpListener;
 
 use crate::auth;
 use crate::handlers::movies::{
-    get_movie_details, get_watched_movies_page, handle_delete_watchlisted_movie,
+    get_movie_details, get_watched_movies_page, handle_delete_watchlisted_movie, stream_video,
 };
 use crate::handlers::profile::get_profile_page;
 use crate::handlers::watchlist::get_watchlist_page;
@@ -264,6 +264,7 @@ impl App {
             .route("/test", get(root))
             .merge(protected_route)
             .merge(auth::login::router())
+            .route("/movies/stream/{movie_id}", get(stream_video))
             .route("/profile/{username}", get(get_profile_page))
             .route("/movies/{movie_id}", get(get_movie_details))
             .route("/watchlist/{username}", get(get_watchlist_page))

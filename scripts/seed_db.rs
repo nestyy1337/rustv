@@ -81,6 +81,7 @@ async fn main() -> Result<(), sqlx::Error> {
             2001,
             "Fantasy",
         ),
+        ("tt0443706", "Zodiac", "David Fincher", 2007, "Crime"),
     ];
 
     for (imdb_id, title, director, year, genre) in movies {

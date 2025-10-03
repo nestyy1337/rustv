@@ -36,6 +36,7 @@ sqlx-sqlite = "0.8.6"
 thiserror = "2.0.12"
 time = { version = "0.3.43", features = ["formatting"] }
 tokio = { version = "1.47.1", features = ["rt", "macros", "rt-multi-thread", "test-util", "signal"] }
+tokio-util = "0.7.16"
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["trace"] }
 tower-sessions = "0.14.0"
