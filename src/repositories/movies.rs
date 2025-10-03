@@ -32,7 +32,7 @@ impl MovieRepository {
         ORDER BY wm.watched_at DESC
         "#,
     )
-    .bind(&user.id)
+    .bind(user.id)
     .fetch_all(&pool)
     .await?;
 
@@ -42,6 +42,6 @@ impl MovieRepository {
             movies
         );
 
-        return Ok(Some(movies));
+        Ok(Some(movies))
     }
 }

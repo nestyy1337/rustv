@@ -35,7 +35,7 @@ impl WatchedMovieDetailed {
 
     pub fn imdb_url(&self) -> String {
         if let Some(id) = &self.imdb_id {
-            format_imdb_url(&id)
+            format_imdb_url(id)
         } else {
             "NOT AVAILABLE".to_string()
         }

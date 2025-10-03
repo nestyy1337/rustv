@@ -137,7 +137,7 @@ impl AuthSessionData {
     }
 
     pub fn is_admin(&self) -> bool {
-        self.user.as_ref().map_or(false, |u| u.is_admin)
+        self.user.as_ref().is_some_and(|u| u.is_admin)
     }
 
     pub fn username(&self) -> Option<String> {
@@ -167,7 +167,7 @@ where
             .get::<AuthSession<_>>()
             .cloned()
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
-        return Ok(x);
+        Ok(x)
     }
 }
 
@@ -222,7 +222,7 @@ impl AuthSession<AuthBackendSqlite> {
         let inner = Arc::new(Mutex::new(AuthSessionData {
             user,
             session,
-            data: data,
+            data,
         }));
 
         Ok(AuthSession { backend, inner })
@@ -253,7 +253,7 @@ impl AuthSession<AuthBackendSqlite> {
                 .await
                 .map_err(|_| Error::SessionNotFound)?;
         }
-        inner.data.user = user.id.into();
+        inner.data.user = user.id;
         inner.data.auth_hash = Some(auth_hash);
         drop(inner);
 
@@ -288,7 +288,7 @@ impl AuthSession<AuthBackendSqlite> {
             .session
             .insert("data", &inner.data)
             .await
-            .map_err(|e| Error::SessionUpdateFailed)?;
+            .map_err(|_e| Error::SessionUpdateFailed)?;
 
         Ok(())
     }
@@ -361,7 +361,7 @@ pub fn verify_password(password: impl AsRef<[u8]>, hash: &str) -> Result<(), Err
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc, time::Duration};
+    use std::{collections::HashMap, sync::Arc};
 
     use chrono::Utc;
     use reqwest::{

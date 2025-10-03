@@ -2,21 +2,16 @@ use anyhow::Result;
 use askama::Template;
 use axum::extract::Request;
 use axum::http::StatusCode;
-use axum::middleware::{from_fn, FromFnLayer, Next};
+use axum::middleware::{from_fn, Next};
 use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::routing::{delete, Route};
-use axum::{debug_handler, middleware};
-use axum_messages::MessagesManagerLayer;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, Executor, Pool};
+use axum::routing::delete;
+use sqlx::Pool;
 use std::{marker::PhantomData, net::Ipv4Addr, sync::Arc};
 use time::OffsetDateTime;
-use tower::Layer;
 use tower_http::trace::TraceLayer;
-use tower_sessions::{cookie, ExpiredDeletion, Session, SessionStore};
+use tower_sessions::{cookie, ExpiredDeletion, Session};
 use tower_sessions::{cookie::time::Duration, Expiry, SessionManagerLayer};
-use tower_sessions_sqlx_store::{sqlx::SqlitePool, SqliteStore};
+use tower_sessions_sqlx_store::SqliteStore;
 use tracing::info;
 
 use axum::{extract::State, routing::get, Router};
@@ -34,14 +29,12 @@ use crate::repositories::users::UserProfileRepository;
 use crate::shared::logging::{
     trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
 };
-use crate::shared::middleware::{
-    AuthBackend, AuthBackendSqlite, AuthLayer, AuthSession, AuthSessionData, UserAuthData,
-};
+use crate::shared::middleware::{AuthBackendSqlite, AuthLayer, AuthSession};
 use crate::views::pages::FrontPageData;
 
 async fn root(
     State(_state): State<Arc<AppState>>,
-    mut session: AuthSession<AuthBackendSqlite>,
+    session: AuthSession<AuthBackendSqlite>,
 ) -> impl IntoResponse {
     let user_id = if session.is_user().await {
         session.inner.lock().await.user_id()
@@ -59,7 +52,7 @@ async fn root(
     }];
 
     let user_data = if let Some(uid) = user_id {
-        match UserProfileRepository::from_user_id(&_state.pool, uid as i64).await {
+        match UserProfileRepository::from_user_id(&_state.pool, uid).await {
             Ok(profile) => profile,
             Err(e) => {
                 info!("Failed to fetch user profile: {:?}", e);
@@ -87,6 +80,12 @@ pub struct AppBuilder<AddressState, PortState> {
     tls: bool,
     prod: bool,
     _marker: PhantomData<(AddressState, PortState)>,
+}
+
+impl Default for AppBuilder<AddressNotSet, PortNotSet> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AppBuilder<AddressNotSet, PortNotSet> {
@@ -144,7 +143,7 @@ impl<AddressState, PortState> AppBuilder<AddressState, PortState> {
             address: self.address,
             port: self.port,
             tls: self.tls,
-            prod: prod,
+            prod,
             _marker: PhantomData,
         }
     }
@@ -183,11 +182,11 @@ impl AppBuilder<AddressSet, PortSet> {
         ))
         .await?;
 
-        return Ok(App {
+        Ok(App {
             listener,
             tls: self.tls,
             prod: self.prod,
-        });
+        })
     }
 }
 
@@ -197,7 +196,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(pool: Pool<sqlx::Sqlite>) -> Self {
-        Self { pool: pool }
+        Self { pool }
     }
 }
 

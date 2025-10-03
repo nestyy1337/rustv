@@ -4,11 +4,10 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
 };
-use axum::extract::FromRef;
 use std::{net::Ipv4Addr, sync::Once};
 
 use chrono::DateTime;
-use sqlx::{Executor, Pool, Sqlite};
+use sqlx::{Pool, Sqlite};
 
 use crate::{app::AppBuilder, models::users::User, shared::error::Error};
 
@@ -34,7 +33,7 @@ pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
         .expect("Failed to build test app");
 
     // setup throughaway database connection
-    let db_url = format!("sqlite::memory:");
+    let db_url = "sqlite::memory:".to_string();
     let db_pool = sqlx::SqlitePool::connect(&db_url)
         .await
         .expect("failed to connect to database");
@@ -57,7 +56,7 @@ pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
         id: 1,
         username: "ferris".to_string(),
         email: "ferris@gmail.com".to_string(),
-        password_hash: password_hash,
+        password_hash,
         display_name: None,
         is_admin: false,
         created_at: some_date,

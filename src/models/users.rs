@@ -1,7 +1,7 @@
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, Pool, Sqlite};
+use sqlx::prelude::FromRow;
 
 use crate::shared::error::Error;
 

@@ -15,7 +15,7 @@ use crate::{
         movies::MovieRepository,
         users::{UserProfileRepository, UserRepository},
     },
-    services::{movies::MovieService, watchlist::WatchlistService},
+    services::watchlist::WatchlistService,
     shared::{
         error::Error,
         middleware::{AuthBackendSqlite, AuthSession},
@@ -73,7 +73,7 @@ pub async fn handle_delete_watchlisted_movie(
         user_id,
         movie_id
     );
-    Ok(WatchlistService::delete_watchlisted_movie(movie_id, user_id, state.pool.clone()).await?)
+    WatchlistService::delete_watchlisted_movie(movie_id, user_id, state.pool.clone()).await
 }
 
 pub async fn get_profile_ratings(

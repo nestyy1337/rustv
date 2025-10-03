@@ -14,7 +14,7 @@ impl MovieService {
         user: &User,
         pool: Pool<Sqlite>,
     ) -> Result<Option<Vec<WatchedMovieDetailed>>, Error> {
-        let movies = MovieRepository::find_watched_movies_by_username(&user, pool.clone()).await;
+        let movies = MovieRepository::find_watched_movies_by_username(user, pool.clone()).await;
 
         tracing::debug!(
             "Fetched watched movies for user {}: {:?}",
@@ -30,9 +30,10 @@ impl MovieService {
             }
         };
 
-        return Ok(movies);
+        Ok(movies)
     }
 
+    #[allow(dead_code)]
     async fn get_imdb_id_internal(
         movie_id: i64,
         pool: Pool<Sqlite>,
@@ -43,9 +44,10 @@ impl MovieService {
         .bind(movie_id)
         .fetch_optional(&pool)
         .await?;
-        return Ok(mapping);
+        Ok(mapping)
     }
 
+    #[allow(dead_code)]
     async fn get_imdb_id_api(movie_title: &str) -> Result<Option<String>, Error> {
         let client = reqwest::Client::new();
         let resp = client
@@ -62,6 +64,6 @@ impl MovieService {
                 return Err(Error::ReqwestError(e));
             }
         };
-        return Ok(Some(body.text().await.unwrap()));
+        Ok(Some(body.text().await.unwrap()))
     }
 }

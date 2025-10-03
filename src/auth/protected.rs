@@ -1,11 +1,3 @@
-use askama::Template;
-use axum::{
-    Router,
-    http::StatusCode,
-    response::{Html, IntoResponse},
-    routing::get,
-};
-use axum_messages::{Message, Messages};
 
 // #[derive(Template)]
 // #[template(path = "protected.html")]

@@ -15,16 +15,8 @@ use axum::{
 };
 use serde::Deserialize;
 use sqlx::SqlitePool;
-use tower_sessions_sqlx_store::SqliteStore;
 
-use crate::{
-    app::AppState,
-    models::users::User,
-    shared::{
-        error::Error,
-        middleware::{AuthBackend, AuthBackendSqlite, AuthLayer, AuthSessionData},
-    },
-};
+use crate::{app::AppState, models::users::User, shared::error::Error};
 
 #[derive(Template)]
 #[template(path = "login.html")]
@@ -84,10 +76,10 @@ mod post {
     use std::sync::Arc;
 
     use axum::extract::State;
-    use tower_sessions::Session;
+
     use tracing::{info, warn};
 
-    use crate::shared::{error::Error, middleware::AuthSessionData};
+    use crate::shared::error::Error;
 
     use super::*;
 
@@ -115,8 +107,8 @@ mod post {
             Ok(None) => {
                 info!("Authentication failed for user: {}", creds.username);
                 let mut login_url = "/login".to_string();
-                if let Some(next) = creds.next {
-                    login_url = format!("{login_url}");
+                if let Some(_next) = creds.next {
+                    login_url = login_url.to_string();
                 };
 
                 return Redirect::to(&login_url).into_response();
@@ -182,11 +174,8 @@ mod post {
 
 mod get {
 
-    use tower_sessions::Session;
-
     use crate::shared::middleware::AuthBackendSqlite;
     use crate::shared::middleware::AuthSession;
-    use crate::shared::middleware::AuthSessionData;
 
     use super::*;
 
