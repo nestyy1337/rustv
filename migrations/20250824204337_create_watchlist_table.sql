@@ -5,7 +5,7 @@
 --     pub movie_id: i64, // Foreign key to Movie
 --     pub added_at: DateTime<Utc>,
 -- }
---
+
 CREATE TABLE IF NOT EXISTS watchlist (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,

@@ -2,6 +2,7 @@ use sqlx::{Pool, Sqlite};
 
 use crate::{
     models::{movie::Movie, users::User},
+    shared::error::Error,
     views::movie::WatchedMovieDetailed,
 };
 
@@ -43,5 +44,39 @@ impl MovieRepository {
         );
 
         Ok(Some(movies))
+    }
+
+    pub async fn delete_watched_movie(
+        user_id: i64,
+        movie_id: i64,
+        pool: &Pool<Sqlite>,
+    ) -> Result<(), Error> {
+        tracing::info!(
+            "Deleting movie with ID {} from user {}'s watched movies",
+            movie_id,
+            user_id
+        );
+        let _ = sqlx::query!(
+            "DELETE FROM watched_movies WHERE user_id = ? AND movie_id = ?",
+            user_id,
+            movie_id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_top10_latest_movies(pool: &Pool<Sqlite>) -> Result<Vec<Movie>, sqlx::Error> {
+        let movies = sqlx::query_as::<_, Movie>(
+            r#"
+            SELECT * FROM movies
+            ORDER BY release_year DESC
+            LIMIT 10
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(movies)
     }
 }

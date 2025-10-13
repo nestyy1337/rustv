@@ -21,53 +21,28 @@
 
         <!-- Movies Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <!-- Example cards -->
-          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
-            <div class="aspect-[2/3] bg-gradient-to-br from-primary-600 to-accent-purple"></div>
-            <div class="p-4">
-              <h3 class="font-semibold text-dark-text-primary mb-1">Movie Title</h3>
-              <p class="text-sm text-dark-text-secondary">2024 • Action</p>
-              <div class="flex items-center mt-2">
-                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">8.5</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
-            <div class="aspect-[2/3] bg-gradient-to-br from-accent-cyan to-accent-emerald"></div>
-            <div class="p-4">
-              <h3 class="font-semibold text-dark-text-primary mb-1">Another Movie</h3>
-              <p class="text-sm text-dark-text-secondary">2024 • Drama</p>
-              <div class="flex items-center mt-2">
-                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">7.9</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
-            <div class="aspect-[2/3] bg-gradient-to-br from-accent-rose to-accent-purple"></div>
-            <div class="p-4">
-              <h3 class="font-semibold text-dark-text-primary mb-1">Featured Film</h3>
-              <p class="text-sm text-dark-text-secondary">2024 • Thriller</p>
-              <div class="flex items-center mt-2">
-                <span>★</span><span class="text-sm text-dark-text-secondary ml-1">9.1</span>
-              </div>
-            </div>
-          </div>
-
           {% for movie in movies %}
-          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
-            <div class="aspect-[2/3] bg-dark-hover"></div>
-            <div class="p-4">
-              <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
-              <div class="text-sm text-dark-text-secondary">
-                {{ movie.release_year }} •
-                {{ movie.genre }} •
+          <a href="/movies/{{ movie.id }}" class="block">
+            <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+              <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
+                <img
+                  src="/movies/{{ movie.id }}/poster"
+                  alt="{{ movie.title }} poster"
+                  class="w-full h-full object-cover"
+                  onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
+                />
               </div>
-              <div class="flex items-center mt-2">
+              <div class="p-4">
+                <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
+                <div class="text-sm text-dark-text-secondary">
+                  {{ movie.release_year }} •
+                  {{ movie.genre }} •
+                </div>
+                <div class="flex items-center mt-2">
+                </div>
               </div>
             </div>
-          </div>
+          </a>
           {% endfor %}
         </div>
 

@@ -59,4 +59,24 @@ impl WatchlistService {
         );
         Ok(())
     }
+
+    pub async fn add_watchlsited_movie(
+        user_id: i64,
+        movie_id: i64,
+        pool: Pool<Sqlite>,
+    ) -> Result<(), Error> {
+        let result = WatchlistRepository::add(&pool, user_id, movie_id).await;
+        match result {
+            Ok(_) => tracing::info!("Movie added to watchlist successfully"),
+            Err(e) => match e.as_database_error() {
+                Some(db_err) if db_err.code() == Some("2067".into()) => {
+                    return Err(Error::Generic("Movie is already in your watchlist".into()));
+                }
+                _ => {
+                    return Err(e.into());
+                }
+            },
+        }
+        Ok(())
+    }
 }

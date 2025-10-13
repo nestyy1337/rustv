@@ -99,18 +99,37 @@ async fn main() -> Result<(), sqlx::Error> {
     }
     println!("Inserted movies");
 
+    // we need to get the real ids of the movies
+    let movie_ids: Vec<(i64, String)> = sqlx::query_as("SELECT id, imdb_id FROM movies")
+        .fetch_all(&pool)
+        .await?;
+    let ids = movie_ids
+        .into_iter()
+        .filter_map(|r| r.0.into())
+        .collect::<Vec<i64>>();
+
     let reviews = vec![
-        (1, 1, "Absolutely brilliant masterpiece!", 9.5),
-        (1, 2, "Classic cinema at its finest.", 9.0),
-        (2, 1, "Best movie I've ever seen!", 10.0),
-        (2, 3, "Heath Ledger's performance is unforgettable.", 9.8),
-        (3, 4, "Epic trilogy conclusion!", 9.2),
-        (3, 5, "Tarantino's genius on full display.", 8.9),
-        (4, 1, "Absolutely brilliant masterpiece!", 9.5),
-        (4, 2, "Classic cinema at its finest.", 9.0),
-        (4, 3, "Heath Ledger's performance is unforgettable.", 9.8),
-        (4, 4, "Epic trilogy conclusion!", 9.2),
-        (4, 5, "Tarantino's genius on full display.", 8.9),
+        (1, ids[0], "Absolutely brilliant masterpiece!", 9.5),
+        (1, ids[1], "Classic cinema at its finest.", 9.0),
+        (2, ids[0], "Best movie I've ever seen!", 10.0),
+        (
+            2,
+            ids[2],
+            "Heath Ledger's performance is unforgettable.",
+            9.8,
+        ),
+        (3, ids[3], "Epic trilogy conclusion!", 9.2),
+        (3, ids[4], "Tarantino's genius on full display.", 8.9),
+        (4, ids[0], "Absolutely brilliant masterpiece!", 9.5),
+        (4, ids[2], "Classic cinema at its finest.", 9.0),
+        (
+            4,
+            ids[3],
+            "Heath Ledger's performance is unforgettable.",
+            9.8,
+        ),
+        (4, ids[3], "Epic trilogy conclusion!", 9.2),
+        (4, ids[4], "Tarantino's genius on full display.", 8.9),
     ];
 
     for (user_id, movie_id, content, rating) in reviews {
@@ -128,18 +147,17 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("Inserted reviews");
 
     let watchlist = vec![
-        (1, 3),
-        (1, 4),
-        (2, 5),
-        (3, 1),
-        (3, 2),
-        (4, 1),
-        (4, 2),
-        (4, 3),
-        (4, 4),
-        (4, 5),
+        (1, ids[2]),
+        (1, ids[3]),
+        (2, ids[4]),
+        (3, ids[0]),
+        (3, ids[1]),
+        (4, ids[0]),
+        (4, ids[1]),
+        (4, ids[2]),
+        (4, ids[3]),
+        (4, ids[4]),
     ];
-
     for (user_id, movie_id) in watchlist {
         sqlx::query(
             "INSERT OR IGNORE INTO watchlist (user_id, movie_id)
@@ -153,19 +171,18 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("Inserted watchlist entries");
 
     let watched = vec![
-        (1, 1, Some(9.5)),
-        (1, 2, Some(9.0)),
-        (2, 1, Some(10.0)),
-        (2, 3, Some(9.8)),
-        (3, 4, Some(9.2)),
-        (3, 5, None),
-        (4, 1, Some(9.5)),
-        (4, 2, Some(9.0)),
-        (4, 3, Some(9.8)),
-        (4, 4, Some(9.2)),
-        (4, 5, Some(8.9)),
+        (1, ids[0], Some(9.5)),
+        (1, ids[1], Some(9.0)),
+        (2, ids[0], Some(10.0)),
+        (2, ids[2], Some(9.8)),
+        (3, ids[3], Some(9.2)),
+        (3, ids[4], None),
+        (4, ids[0], Some(9.5)),
+        (4, ids[1], Some(9.0)),
+        (4, ids[2], Some(9.8)),
+        (4, ids[3], Some(9.2)),
+        (4, ids[4], Some(8.9)),
     ];
-
     for (user_id, movie_id, rating) in watched {
         sqlx::query(
             "INSERT OR IGNORE INTO watched_movies (user_id, movie_id, rating)

@@ -44,7 +44,7 @@
 {% if movies.len() > 0 %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for movie in movies %}
-    <div class="glass rounded-xl p-6 shadow-2xl hover-lift">
+    <div class="glass rounded-xl p-6 shadow-2xl hover-lift" data-movie-id="{{ movie.movie_id }}" data-watched-at="{{ movie.watched_at }}">
         <!-- Movie Header -->
         <div class="flex items-start justify-between mb-4">
             <div class="flex-grow">
@@ -82,6 +82,9 @@
                 View Details
             </button>
             </a>
+            <button class="btn-delete-history bg-dark-hover text-dark-text-primary text-xs font-medium py-1.5 px-3 rounded-lg hover:bg-dark-border transition-colors">
+                Delete from history
+            </button>
             {% if movie.rating.is_none() %}
             <button class="bg-dark-hover text-dark-text-primary text-xs font-medium py-1.5 px-3 rounded-lg hover:bg-dark-border transition-colors">
                 Add Rating
@@ -126,3 +129,88 @@
 {% endif %}
 
 {%- endblock -%}
+
+
+{% block extra_js %}
+<script>
+    document.querySelector('select').addEventListener('change', function() {
+        const sortBy = this.value;
+        const sortHandlers = {
+            'recent': () => sortByRecent(),
+            'rating': () => sortByRating(),
+            'title': () => sortByTitle()
+        };
+        sortHandlers[sortBy]?.();
+    });
+
+function sortByRecent() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort(calcTimeDiff);
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function sortByRating() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort((a, b) => {
+        const ratingA = parseFloat(a.querySelector('.text-accent-rose')?.nextElementSibling?.textContent) || 0;
+        const ratingB = parseFloat(b.querySelector('.text-accent-rose')?.nextElementSibling?.textContent) || 0;
+        return ratingB - ratingA;
+    });
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function sortByTitle() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort((a, b) => {
+        const titleA = a.querySelector('h3').textContent.toLowerCase();
+        const titleB = b.querySelector('h3').textContent.toLowerCase();
+        return titleA.localeCompare(titleB);
+    });
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function calcTimeDiff(a, b) {
+    return new Date(a.dataset.watchedAt) - new Date(b.dataset.watchedAt);
+}
+
+
+document.querySelectorAll('.btn-delete-history').forEach(button => {
+    button.addEventListener('click', async function() {
+        const movieCard = this.closest('.glass');
+        const movieTitle = movieCard.querySelector('h3').textContent;
+        const movieId = movieCard.dataset.movieId;
+        console.log(`Attempting to delete movie ID: ${movieId}`);
+        console.log(`MovieCard: `, movieCard);
+        if (!confirm(`Are you sure you want to remove "${movieTitle}" from your watched history?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/watched/{{ profile.username }}/${movieCard.dataset.movieId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete movie from history');
+            }
+
+            movieCard.remove();
+
+            alert(`"${movieTitle}" has been removed from your watched history.`);
+        } catch (error) {
+            console.error('Error deleting movie from history:', error);
+            alert('An error occurred while trying to remove the movie. Please try again.');
+        }
+    });
+});
+
+</script>
+{% endblock %}
+
+

@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const errorState = card.querySelector('.error-state');
 
         try {
-            const response = await fetch(`/movies/${movieId}`);
+            const response = await fetch(`/movies/${movieId}/raw`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch movie');
@@ -128,7 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // Remove button functionality
         const removeBtn = card.querySelector('.remove-btn');
         if (removeBtn) {
             removeBtn.addEventListener('click', async () => {
@@ -136,11 +135,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (confirm('Remove this movie from your watchlist?')) {
                     try {
-                        const response = await fetch(`/watchlist/movie/${movieId}`, {
+                        const response = await fetch(`/api/watchlist`, {
                             method: 'DELETE',
                             headers: {
                                 'Content-Type': 'application/json',
-                            }
+                            },
+                            body: JSON.stringify({ movie_id: parseInt(movieId) }),
                         });
 
                         if (response.ok) {
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     } catch (error) {
                         console.error('Error removing movie:', error);
-                        alert('Error removing movie from watchlist');
+                        alert('Error removing movie from wa// Could be null or objecttchlist');
                     }
                 }
             });

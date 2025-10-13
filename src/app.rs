@@ -19,12 +19,14 @@ use tokio::net::TcpListener;
 
 use crate::auth;
 use crate::handlers::movies::{
-    get_movie_details, get_watched_movies_page, handle_delete_watchlisted_movie, stream_video,
+    add_watched_movie, delete_watched_movie, delete_watchlisted_movie, get_movie_details,
+    get_movie_details_json, get_poster, get_watched_movies_page, stream_video, test_player,
 };
 use crate::handlers::profile::get_profile_page;
-use crate::handlers::watchlist::get_watchlist_page;
+use crate::handlers::watchlist::{add_watchlist_movie, get_watchlist_page};
 use crate::models::movie::Movie;
 use crate::models::users::UserProfile;
+use crate::repositories::movies::MovieRepository;
 use crate::repositories::users::UserProfileRepository;
 use crate::shared::logging::{
     trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
@@ -36,20 +38,16 @@ async fn root(
     State(_state): State<Arc<AppState>>,
     session: AuthSession<AuthBackendSqlite>,
 ) -> impl IntoResponse {
-    let user_id = if session.is_user().await {
-        session.inner.lock().await.user_id()
-    } else {
-        None
-    };
-    let movies = vec![Movie {
-        id: 1,
-        title: "Example Movie".to_string(),
-        director: "Jane Doe".to_string(),
-        release_year: 2023,
-        genre: "Drama".to_string(),
-        created_at: Some(OffsetDateTime::now_utc()),
-        updated_at: Some(OffsetDateTime::now_utc()),
-    }];
+    let session_guard = session.inner.lock().await;
+    let user_id = session_guard.user_id();
+    drop(session_guard);
+
+    let movies = MovieRepository::get_top10_latest_movies(&_state.pool)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("Failed to fetch latest movies: {:?}", e);
+            vec![]
+        });
 
     let user_data = if let Some(uid) = user_id {
         match UserProfileRepository::from_user_id(&_state.pool, uid).await {
@@ -248,6 +246,12 @@ impl App {
 
         let protected_route = Router::new()
             .route("/", get(root))
+            .route("/profile/{username}", get(get_profile_page))
+            .route("/watched/{username}", get(get_watched_movies_page))
+            .route(
+                "/watched/{username}/{movie_id}",
+                delete(delete_watched_movie).post(add_watched_movie),
+            )
             .route_layer(from_fn(require_auth_redirect));
 
         let session_layer = SessionManagerLayer::new(session_store)
@@ -262,16 +266,17 @@ impl App {
 
         let app = Router::new()
             .route("/test", get(root))
+            .route("/watch/{movie_id}", get(test_player))
             .merge(protected_route)
             .merge(auth::login::router())
-            .route("/movies/stream/{movie_id}", get(stream_video))
-            .route("/profile/{username}", get(get_profile_page))
+            .route("/movies/{movie_id}/poster", get(get_poster))
             .route("/movies/{movie_id}", get(get_movie_details))
+            .route("/movies/stream/{movie_id}", get(stream_video))
+            .route("/movies/{movie_id}/raw", get(get_movie_details_json))
             .route("/watchlist/{username}", get(get_watchlist_page))
-            .route("/watched/{username}", get(get_watched_movies_page))
             .route(
-                "/watchlist/movie/{movie_id}",
-                delete(handle_delete_watchlisted_movie),
+                "/api/watchlist",
+                delete(delete_watchlisted_movie).post(add_watchlist_movie),
             )
             .with_state(Arc::new(AppState::new(pool)))
             .layer(auth_layer)

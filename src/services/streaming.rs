@@ -39,6 +39,7 @@ async fn get_movie_path(movie_id: i64, pool: &Pool<Sqlite>) -> Result<PathBuf, E
 }
 
 pub async fn parse_range_header(header: &str, file_size: u64) -> Result<Option<(u64, u64)>, Error> {
+    println!("Parsing range header: {}", header);
     if !header.starts_with("bytes=") {
         return Ok(None);
     }
@@ -54,6 +55,10 @@ pub async fn parse_range_header(header: &str, file_size: u64) -> Result<Option<(
         parts[1].parse().map_err(|_| Error::InvalidRange)?
     };
     if start > end || end >= file_size {
+        println!(
+            "Invalid range: start={}, end={}, file_size={}",
+            start, end, file_size
+        );
         return Ok(None);
     }
     Ok(Some((start, end)))

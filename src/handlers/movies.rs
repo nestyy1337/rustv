@@ -1,4 +1,5 @@
 use askama::Template;
+use serde::Deserialize;
 use std::sync::Arc;
 
 use axum::{
@@ -12,6 +13,7 @@ use reqwest::StatusCode;
 
 use crate::{
     app::AppState,
+    clients::tmdb::TmdbClient,
     models::movie::{Movie, WatchedMovie},
     repositories::{
         movies::MovieRepository,
@@ -23,13 +25,57 @@ use crate::{
         watchlist::WatchlistService,
     },
     shared::{
+        config::SETTINGS,
         error::Error,
         middleware::{AuthBackendSqlite, AuthSession},
     },
-    views::movie::{RatingsPageData, WatchedMovieData},
+    views::movie::{MovieDetailsData, RatingsPageData, WatchedMovieData},
 };
 
 pub async fn get_movie_details(
+    State(state): State<Arc<AppState>>,
+    Path(movie_id): Path<i64>,
+    auth_session: AuthSession<AuthBackendSqlite>,
+) -> Result<Html<String>, Error> {
+    let session_guard = auth_session.inner.lock().await;
+    let user_id = session_guard
+        .user_id()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
+    let movie = MovieRepository::get_movie_by_id(&state.pool.clone(), movie_id)
+        .await?
+        .ok_or(Error::MovieNotFound)?;
+
+    let watchlisted = MovieService::is_watchlisted(user_id, movie_id, &state.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to check watchlist status: {}", e);
+            Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+        })?;
+
+    let watched = MovieService::is_watched(user_id, movie_id, &state.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to check watched status: {}", e);
+            Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+        })?;
+
+    tracing::info!(
+        "User {} watchlist status for movie {}: {}",
+        user_id,
+        movie_id,
+        watchlisted
+    );
+
+    let user_profile = UserProfileRepository::from_user_id(&state.pool.clone(), user_id).await?;
+    let movie_details_data = MovieDetailsData::new(movie, watchlisted, watched, user_profile);
+    let body = movie_details_data.render().map_err(|e| {
+        tracing::error!("Template rendering error: {}", e);
+        Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+    })?;
+    Ok(Html(body))
+}
+
+pub async fn get_movie_details_json(
     State(state): State<Arc<AppState>>,
     Path(movie_id): Path<i64>,
 ) -> Result<Json<Movie>, Error> {
@@ -64,16 +110,23 @@ pub async fn get_watched_movies(
     Ok(Json::default())
 }
 
-pub async fn handle_delete_watchlisted_movie(
+#[derive(Deserialize)]
+pub struct DeleteWatchlistPayload {
+    movie_id: i64,
+}
+
+pub async fn delete_watchlisted_movie(
     State(state): State<Arc<AppState>>,
-    Path(movie_id): Path<i64>,
     session: AuthSession<AuthBackendSqlite>,
+    Json(payload): Json<DeleteWatchlistPayload>,
 ) -> Result<(), Error> {
     let session_guard = session.inner.lock().await;
     let user_id = session_guard
         .user_id()
         .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
     drop(session_guard);
+    let movie_id = payload.movie_id;
+
     tracing::info!(
         "User {} requested deletion of movie ID {} from watchlist",
         user_id,
@@ -163,6 +216,73 @@ pub async fn get_watched_movies_page(
     Ok(Html(rendered))
 }
 
+pub async fn delete_watched_movie(
+    State(state): State<Arc<AppState>>,
+    Path((username, movie_id)): Path<(String, i64)>,
+    auth_session: AuthSession<AuthBackendSqlite>,
+) -> Result<impl IntoResponse, Error> {
+    let session_guard = auth_session.inner.lock().await;
+    let authenticated_user_id = session_guard
+        .user_id()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
+    if session_guard
+        .username()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?
+        != username
+    {
+        tracing::warn!(
+            "User {} attempted to delete {}'s watched movie",
+            session_guard
+                .username()
+                .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?,
+            username
+        );
+        return Err(Error::Status(StatusCode::FORBIDDEN));
+    }
+    drop(session_guard);
+    tracing::info!(
+        "User {} requested deletion of movie ID {} from watched movies",
+        authenticated_user_id,
+        movie_id
+    );
+
+    Ok(
+        MovieRepository::delete_watched_movie(authenticated_user_id, movie_id, &state.pool.clone())
+            .await?,
+    )
+}
+
+pub async fn add_watched_movie(
+    State(state): State<Arc<AppState>>,
+    Path((username, movie_id)): Path<(String, i64)>,
+    auth_session: AuthSession<AuthBackendSqlite>,
+) -> Result<impl IntoResponse, Error> {
+    let session_guard = auth_session.inner.lock().await;
+    let authenticated_user_id = session_guard
+        .user_id()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
+    if session_guard
+        .username()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?
+        != username
+    {
+        tracing::warn!(
+            "User {} attempted to add to {}'s watched movies",
+            session_guard
+                .username()
+                .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?,
+            username
+        );
+        return Err(Error::Status(StatusCode::FORBIDDEN));
+    }
+    drop(session_guard);
+
+    Ok(
+        MovieService::add_watched_movie(authenticated_user_id, movie_id, None, &state.pool.clone())
+            .await?,
+    )
+}
+
 pub async fn stream_video(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -187,7 +307,9 @@ pub async fn stream_video(
             tracing::error!("Invalid Range header: {}", e);
             Error::InvalidRange
         })?;
+    tracing::info!("Raw Range header: {}", raw_range);
     let range_header = parse_range_header(raw_range, file_size).await;
+    println!("Range header after parsing: {:?}", range_header);
     let range_header = match range_header {
         Ok(range) => range,
         Err(e) => {
@@ -223,4 +345,65 @@ pub async fn stream_video(
             tracing::error!("Failed to build response: {}", e);
             Error::TokioIoError(std::io::Error::new(std::io::ErrorKind::Other, e))
         })
+}
+
+pub async fn test_player(Path(movie_id): Path<i64>) -> Html<String> {
+    Html(format!(
+        r#"
+<!DOCTYPE html>
+<html>
+<body>
+    <video controls width="800">
+        <source src="/movies/stream/{}" type="video/mp4">
+    </video>
+</body>
+</html>
+    "#,
+        movie_id,
+    ))
+}
+
+pub async fn get_poster(
+    Path(movie_id): Path<i64>,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, Error> {
+    let movie = MovieRepository::get_movie_by_id(&state.pool, movie_id)
+        .await?
+        .ok_or(Error::MovieNotFound)?;
+    let file_path = format!("movies/{}_poster.jpg", movie_id);
+    if let Some(file) = tokio::fs::read(&file_path).await.ok() {
+        tracing::info!("Serving poster from file: {}", file_path);
+        return Ok(Response::builder()
+            .status(200)
+            .header("Content-Type", "image/jpeg")
+            .header("Content-Length", file.len().to_string())
+            .body(Body::from(file))
+            .map_err(|e| {
+                tracing::error!("Failed to build image response: {}", e);
+                Error::TokioIoError(std::io::Error::new(std::io::ErrorKind::Other, e))
+            })?);
+    } else {
+        // we need to query the tmdb
+        let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
+        let movie = client
+            .get_movie_details(&movie.imdb_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch movie details from TMDB: {}", e);
+                Error::Generic("Failed to fetch movie details".into())
+            })?;
+        let bytes_png = client.get_poster(movie, movie_id).await.map_err(|e| {
+            tracing::error!("Failed to fetch poster from TMDB: {}", e);
+            Error::Generic("Failed to fetch poster".into())
+        })?;
+        return Ok(Response::builder()
+            .status(200)
+            .header("Content-Type", "image/jpeg")
+            .header("Content-Length", bytes_png.len().to_string())
+            .body(Body::from(bytes_png))
+            .map_err(|e| {
+                tracing::error!("Failed to build image response: {}", e);
+                Error::TokioIoError(std::io::Error::new(std::io::ErrorKind::Other, e))
+            })?);
+    }
 }

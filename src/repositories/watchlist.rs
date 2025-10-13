@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use sqlx::{Pool, Sqlite};
 
 use crate::models::movie::Watchlist;
@@ -32,5 +33,28 @@ impl WatchlistRepository {
         .await?;
 
         Ok(result.rows_affected())
+    }
+
+    // CREATE TABLE IF NOT EXISTS watchlist (
+    //     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    //     user_id INTEGER NOT NULL,
+    //     movie_id INTEGER NOT NULL,
+    //     added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    //     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    //     FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+    //     UNIQUE(user_id, movie_id)
+
+    pub async fn add(pool: &Pool<Sqlite>, user_id: i64, movie_id: i64) -> Result<(), sqlx::Error> {
+        let now = chrono::Utc::now();
+
+        let _ = sqlx::query!(
+            "INSERT INTO watchlist (user_id, movie_id, added_at) VALUES (?,?,?) ON CONFLICT(user_id, movie_id) DO NOTHING",
+            user_id,
+            movie_id,
+            now
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 }

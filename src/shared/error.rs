@@ -49,6 +49,8 @@ pub enum Error {
     MissingRange,
     #[error("generic error: {0}")]
     Generic(String),
+    #[error("serde json error")]
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
 impl axum::response::IntoResponse for Error {
@@ -76,6 +78,7 @@ impl axum::response::IntoResponse for Error {
             Error::SessionUpdateFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Error::SessionFlushFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Error::SessionClearFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Error::Generic(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             Error::TaskJoin(e) => {
                 tracing::error!("Task join error: {}", e);
                 (

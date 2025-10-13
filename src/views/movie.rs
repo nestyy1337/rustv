@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use time::OffsetDateTime;
 
-use crate::models::users::UserProfile;
+use crate::models::{movie::Movie, users::UserProfile};
 
 #[derive(Template)]
 #[template(path = "watched_movies.html")]
@@ -61,5 +61,25 @@ pub struct RatingsPageData {
 impl RatingsPageData {
     pub fn new(profile: UserProfile) -> Self {
         Self { profile }
+    }
+}
+
+#[derive(Template)]
+#[template(path = "movie_details.html")]
+pub struct MovieDetailsData {
+    pub movie: Movie,
+    pub watchlisted: bool,
+    pub watched: bool,
+    pub profile: UserProfile,
+}
+
+impl MovieDetailsData {
+    pub fn new(movie: Movie, watchlisted: bool, watched: bool, user_profile: UserProfile) -> Self {
+        Self {
+            movie,
+            watchlisted,
+            watched,
+            profile: user_profile,
+        }
     }
 }
