@@ -83,3 +83,7 @@ impl MovieDetailsData {
         }
     }
 }
+
+#[derive(Template)]
+#[template(path = "steal_movies.html")]
+pub struct StealMoviesData {}

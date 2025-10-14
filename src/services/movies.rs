@@ -1,7 +1,13 @@
 use sqlx::{Pool, Sqlite};
 
 use crate::{
-    models::users::User, repositories::movies::MovieRepository, shared::error::Error,
+    clients::tmdb::TmdbClient,
+    models::{
+        imdb_stuff::{TmdbMovie, TmdbSearchResult},
+        users::User,
+    },
+    repositories::movies::MovieRepository,
+    shared::{config::SETTINGS, error::Error},
     views::movie::WatchedMovieDetailed,
 };
 
@@ -104,5 +110,12 @@ impl MovieService {
         );
 
         Ok(())
+    }
+
+    pub async fn search_tmdb_by_title(title: &str) -> Result<Vec<TmdbSearchResult>, Error> {
+        tracing::info!("Searching TMDb for title: {}", title);
+        let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
+        let movies = client.search_by_title(title).await?;
+        Ok(movies)
     }
 }

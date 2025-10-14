@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const errorState = card.querySelector('.error-state');
 
         try {
-            const response = await fetch(`/movies/${movieId}/raw`);
+            const response = await fetch(`/api/movie/${movieId}`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch movie');

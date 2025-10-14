@@ -1,0 +1,187 @@
+{% extends "_layout.html" %}
+{% block title %}Request a Movie{% endblock %}
+{% block page_title %}Request a Movie{% endblock %}
+{% block page_description %}Search and request movies you'd like to watch{% endblock %}
+
+{%- block content -%}
+<div class="w-full -m-6">
+  <div class="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
+
+    <!-- Search Section -->
+    <div class="glass rounded-xl p-6">
+      <h2 class="text-2xl font-bold text-dark-text-primary mb-4">Request a Movie</h2>
+      <p class="text-dark-text-secondary mb-6">Can't find what you're looking for? Search and request it!</p>
+
+      <div class="search-bar relative">
+        <input
+          type="text"
+          placeholder="Search for movies to request..."
+          class="w-full pl-10 pr-4 py-3 rounded-lg bg-dark-surface text-dark-text-primary placeholder-dark-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-400"
+          data-movie-search
+        />
+        <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-dark-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+
+      <div class="mt-4 text-sm text-dark-text-muted" data-search-status>
+        Start typing to search for movies...
+      </div>
+    </div>
+
+    <!-- Search Results -->
+    <div class="glass rounded-xl p-6" data-results-container style="display: none;">
+      <h3 class="text-xl font-semibold text-dark-text-primary mb-4">Search Results</h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-search-results>
+        <!-- Results will be inserted here -->
+      </div>
+    </div>
+
+  </div>
+</div>
+{%- endblock -%}
+
+{% block extra_js %}
+<script>
+let debounceTimer = null;
+const searchInput = document.querySelector('[data-movie-search]');
+const searchStatus = document.querySelector('[data-search-status]');
+const resultsContainer = document.querySelector('[data-results-container]');
+const searchResults = document.querySelector('[data-search-results]');
+
+searchInput.addEventListener('input', function(e) {
+  clearTimeout(debounceTimer);
+
+  const query = e.target.value.trim();
+
+  if (query.length === 0) {
+    resultsContainer.style.display = 'none';
+    searchStatus.textContent = 'Start typing to search for movies...';
+    searchStatus.className = 'mt-4 text-sm text-dark-text-muted';
+    return;
+  }
+
+  searchStatus.textContent = 'Searching...';
+  searchStatus.className = 'mt-4 text-sm text-primary-400';
+
+  debounceTimer = setTimeout(() => {
+    fetch('/api/movie/tmdb/search/' + encodeURIComponent(query))
+      .then(response => response.json())
+      .then(data => {
+        displayResults(data);
+      })
+      .catch(err => {
+        console.error('Search failed:', err);
+        searchStatus.textContent = 'Search failed. Please try again.';
+        searchStatus.className = 'mt-4 text-sm text-red-400';
+      });
+  }, 300);
+});
+
+function displayResults(movies) {
+  if (movies.length === 0) {
+    searchStatus.textContent = 'No movies found.';
+    searchStatus.className = 'mt-4 text-sm text-dark-text-secondary';
+    resultsContainer.style.display = 'none';
+    return;
+  }
+
+  searchStatus.textContent = `Found ${movies.length} results`;
+  searchStatus.className = 'mt-4 text-sm text-dark-text-secondary';
+  resultsContainer.style.display = 'block';
+
+  searchResults.innerHTML = '';
+
+  movies.forEach(movie => {
+    const movieCard = document.createElement('div');
+    movieCard.className = 'bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer relative';
+    movieCard.setAttribute('data-tmdb-id', movie.id);
+
+    // Extract year from release_date (format: "YYYY-MM-DD")
+    const releaseYear = movie.release_date ? movie.release_date.split('-')[0] : 'N/A';
+
+    // Build poster URL (TMDB uses this base URL)
+    const posterUrl = movie.poster_path
+      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+      : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22450%22%3E%3Crect fill=%22%23374151%22 width=%22300%22 height=%22450%22/%3E%3C/svg%3E';
+
+    movieCard.innerHTML = `
+      <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
+        <img
+          src="${posterUrl}"
+          alt="${movie.title} poster"
+          class="w-full h-full object-cover"
+          onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
+        />
+      </div>
+      <div class="p-4">
+        <h3 class="font-semibold text-dark-text-primary mb-1">${movie.title}</h3>
+        <div class="text-sm text-dark-text-secondary mb-3">
+          ${releaseYear}
+        </div>
+        <button
+          class="w-full px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium transition-colors"
+          data-request-btn
+          data-movie-id="${movie.id}"
+        >
+          Request Movie
+        </button>
+      </div>
+    `;
+
+    searchResults.appendChild(movieCard);
+  });
+
+  // Attach event listeners to request buttons
+  document.querySelectorAll('[data-request-btn]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      requestMovie(this.dataset.movieId, btn);
+    });
+  });
+}
+
+function requestMovie(tmdbId, buttonElement) {
+  buttonElement.disabled = true;
+  buttonElement.textContent = 'Requesting...';
+
+  fetch('/api/movie/request', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tmdb_id: tmdbId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      buttonElement.textContent = 'Requested!';
+      buttonElement.classList.remove('bg-primary-600', 'hover:bg-primary-700');
+      buttonElement.classList.add('bg-green-600');
+    } else {
+      buttonElement.textContent = 'Failed';
+      buttonElement.classList.add('bg-red-600');
+      setTimeout(() => {
+        buttonElement.textContent = 'Request Movie';
+        buttonElement.disabled = false;
+        buttonElement.classList.remove('bg-red-600');
+        buttonElement.classList.add('bg-primary-600', 'hover:bg-primary-700');
+      }, 2000);
+    }
+  })
+  .catch(err => {
+    console.error('Request failed:', err);
+    buttonElement.textContent = 'Error';
+    buttonElement.classList.add('bg-red-600');
+    setTimeout(() => {
+      buttonElement.textContent = 'Request Movie';
+      buttonElement.disabled = false;
+      buttonElement.classList.remove('bg-red-600');
+      buttonElement.classList.add('bg-primary-600', 'hover:bg-primary-700');
+    }, 2000);
+  });
+}
+</script>
+{% endblock %}

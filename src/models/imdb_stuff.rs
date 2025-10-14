@@ -64,3 +64,20 @@ pub struct SpokenLanguage {
     pub iso_639_1: String,
     pub name: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TmdbSearchResult {
+    pub id: i32,
+    pub title: String,
+    pub original_title: String,
+    pub overview: Option<String>,
+    pub poster_path: Option<String>,
+    pub backdrop_path: Option<String>,
+    pub release_date: Option<String>,
+    pub popularity: f64,
+    pub vote_average: f64,
+    pub vote_count: i32,
+    pub adult: bool,
+    pub genre_ids: Vec<i32>,
+    pub video: bool,
+}

@@ -13,38 +13,51 @@
         <!-- Section Header -->
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-2xl font-bold text-dark-text-primary">Available Movies</h2>
+          <div class="search-bar relative">
+            <input
+              type="text"
+              placeholder="Search movies..."
+              class="pl-10 pr-4 py-2 rounded-lg bg-dark-surface text-dark-text-primary placeholder-dark-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-400 w-full"
+            />
+            <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-dark-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            </div>
           <div class="flex gap-2">
             <button class="px-4 py-2 text-sm text-dark-text-secondary hover:text-primary-400 transition-colors">Grid View</button>
             <button class="px-4 py-2 text-sm text-dark-text-secondary hover:text-primary-400 transition-colors">List View</button>
           </div>
         </div>
 
-        <!-- Movies Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {% for movie in movies %}
-          <a href="/movies/{{ movie.id }}" class="block">
-            <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
-              <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
-                <img
-                  src="/movies/{{ movie.id }}/poster"
-                  alt="{{ movie.title }} poster"
-                  class="w-full h-full object-cover"
-                  onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
-                />
+      <!-- Movies Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" data-movie-grid>
+        {% for movie in movies %}
+        <a href="/movies/{{ movie.id }}"
+           class="block"
+           data-movie-card
+           data-movie-genre="{{ movie.genre | lower }}"
+           data-movie-year="{{ movie.release_year }}"
+           data-movie-title="{{ movie.title | lower }}">
+          <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+            <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
+              <img
+                src="/api/movie/{{ movie.id }}/poster"
+                alt="{{ movie.title }} poster"
+                class="w-full h-full object-cover"
+                onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
+              />
+            </div>
+            <div class="p-4">
+              <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
+              <div class="text-sm text-dark-text-secondary">
+                {{ movie.release_year }} •
+                {{ movie.genre }} •
               </div>
-              <div class="p-4">
-                <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
-                <div class="text-sm text-dark-text-secondary">
-                  {{ movie.release_year }} •
-                  {{ movie.genre }} •
-                </div>
-                <div class="flex items-center mt-2">
-                </div>
+              <div class="flex items-center mt-2">
               </div>
             </div>
-          </a>
-          {% endfor %}
-        </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
 
         <!-- Pagination -->
         <div class="flex justify-center mt-8 gap-2">
@@ -101,27 +114,27 @@
       <div class="glass rounded-xl p-6">
         <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Categories</h3>
         <div class="space-y-2">
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="action" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Action</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">245</span>
           </button>
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="comedy" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Comedy</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">189</span>
           </button>
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="drama" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Drama</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">324</span>
           </button>
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="scifi" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Sci-Fi</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">127</span>
           </button>
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="horror" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Horror</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">98</span>
           </button>
-          <button class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+          <button data-genre="romance" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
             <span class="text-dark-text-primary">Romance</span>
             <span class="text-dark-text-muted group-hover:text-primary-400">156</span>
           </button>
@@ -134,3 +147,111 @@
   </div> <!-- end flex container -->
 </div> <!-- end wrapper -->
 {%- endblock -%}
+
+{% block extra_js %}
+<script>
+let selectedGenre = null;
+let debounceTimer = null;
+document.querySelector('.search-bar input').addEventListener('input', function(e) {
+  clearTimeout(debounceTimer);
+
+  const query = e.target.value.trim();
+  debounceTimer = setTimeout(() => {
+
+    fetch('/api/movie/search/' + encodeURIComponent(query))
+      .then(response => response.json())
+      .then(data => {
+        updateMovieGrid(data);
+      })
+      .catch(err => console.error('Search failed:', err));
+  }, 300);
+});
+
+
+function updateMovieGrid(movies) {
+  const grid = document.querySelector('[data-movie-grid]');
+  grid.innerHTML = '';
+
+  if (movies.length === 0) {
+    grid.innerHTML = '<p class="text-dark-text-secondary col-span-full text-center">No movies found.</p>';
+    return;
+  }
+
+  movies.forEach(movie => {
+    const movieCard = document.createElement('a');
+    movieCard.href = `/movies/${movie.id}`;
+    movieCard.className = 'block';
+
+    movieCard.setAttribute('data-movie-card', '');
+    movieCard.setAttribute('data-movie-genre', movie.genre.toLowerCase());
+    movieCard.setAttribute('data-movie-year', movie.release_year);
+    movieCard.setAttribute('data-movie-title', movie.title.toLowerCase());
+
+    movieCard.innerHTML = `
+      <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer">
+        <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
+          <img
+            src="/api/movie/${movie.id}/poster"
+            alt="${movie.title} poster"
+            class="w-full h-full object-cover"
+            onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
+          />
+        </div>
+        <div class="p-4">
+          <h3 class="font-semibold text-dark-text-primary mb-1">${movie.title}</h3>
+          <div class="text-sm text-dark-text-secondary">
+            ${movie.release_year} •
+            ${movie.genre} •
+          </div>
+          <div class="flex items-center mt-2">
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (selectedGenre && movie.genre.toLowerCase() !== selectedGenre) {
+      movieCard.style.display = 'none';
+    }
+
+    grid.appendChild(movieCard);
+  });
+}
+
+
+document.querySelectorAll('[data-genre]').forEach(button => {
+  button.addEventListener('click', function() {
+    if (selectedGenre === button.dataset.genre.toLowerCase()) {
+      selectedGenre = null;
+      button.classList.remove('bg-primary-600', 'text-white');
+      button.classList.add('bg-dark-surface');
+
+      document.querySelectorAll('[data-movie-card]').forEach(card => {
+        card.style.display = 'block';
+      });
+      return;
+    }
+
+    document.querySelectorAll('[data-genre]').forEach(btn => {
+      btn.classList.remove('bg-primary-600', 'text-white');
+      btn.classList.add('bg-dark-surface');
+    });
+
+    button.classList.remove('bg-dark-surface');
+    button.classList.add('bg-primary-600', 'text-white');
+
+    selectedGenre = button.dataset.genre.toLowerCase();
+
+    document.querySelectorAll('[data-movie-card]').forEach(card => {
+      const movieGenre = card.dataset.movieGenre;
+      if (movieGenre === selectedGenre) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+});
+
+
+</script>
+{% endblock %}

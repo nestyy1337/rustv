@@ -20,7 +20,8 @@ use tokio::net::TcpListener;
 use crate::auth;
 use crate::handlers::movies::{
     add_watched_movie, delete_watched_movie, delete_watchlisted_movie, get_movie_details,
-    get_movie_details_json, get_poster, get_watched_movies_page, stream_video, test_player,
+    get_movie_details_json, get_poster, get_watched_movies_page, search_movies,
+    search_movies_empty, search_tmdb_by_title, steal_movies, stream_video, test_player,
 };
 use crate::handlers::profile::get_profile_page;
 use crate::handlers::watchlist::{add_watchlist_movie, get_watchlist_page};
@@ -264,20 +265,27 @@ impl App {
             .on_request(trace_layer_on_request)
             .on_response(trace_layer_on_response);
 
+        let api_router = Router::new()
+            .route(
+                "/watchlist",
+                delete(delete_watchlisted_movie).post(add_watchlist_movie),
+            )
+            .route("/movie/{movie_id}", get(get_movie_details_json))
+            .route("/movie/search/{input}", get(search_movies))
+            .route("/movie/search/", get(search_movies_empty))
+            .route("/movie/tmdb/search/{title}", get(search_tmdb_by_title))
+            .route("/movie/{movie_id}/poster", get(get_poster));
+
         let app = Router::new()
             .route("/test", get(root))
             .route("/watch/{movie_id}", get(test_player))
             .merge(protected_route)
             .merge(auth::login::router())
-            .route("/movies/{movie_id}/poster", get(get_poster))
+            .route("/steal", get(steal_movies))
             .route("/movies/{movie_id}", get(get_movie_details))
             .route("/movies/stream/{movie_id}", get(stream_video))
-            .route("/movies/{movie_id}/raw", get(get_movie_details_json))
             .route("/watchlist/{username}", get(get_watchlist_page))
-            .route(
-                "/api/watchlist",
-                delete(delete_watchlisted_movie).post(add_watchlist_movie),
-            )
+            .nest("/api", api_router)
             .with_state(Arc::new(AppState::new(pool)))
             .layer(auth_layer)
             .layer(session_layer)

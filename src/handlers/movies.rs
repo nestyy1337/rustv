@@ -14,7 +14,10 @@ use reqwest::StatusCode;
 use crate::{
     app::AppState,
     clients::tmdb::TmdbClient,
-    models::movie::{Movie, WatchedMovie},
+    models::{
+        imdb_stuff::{TmdbMovie, TmdbSearchResult},
+        movie::{Movie, WatchedMovie},
+    },
     repositories::{
         movies::MovieRepository,
         users::{UserProfileRepository, UserRepository},
@@ -29,7 +32,7 @@ use crate::{
         error::Error,
         middleware::{AuthBackendSqlite, AuthSession},
     },
-    views::movie::{MovieDetailsData, RatingsPageData, WatchedMovieData},
+    views::movie::{MovieDetailsData, RatingsPageData, StealMoviesData, WatchedMovieData},
 };
 
 pub async fn get_movie_details(
@@ -108,6 +111,36 @@ pub async fn get_watched_movies(
     }
 
     Ok(Json::default())
+}
+
+pub async fn search_movies(
+    State(state): State<Arc<AppState>>,
+    Path(input): Path<String>,
+) -> Result<Json<Vec<Movie>>, Error> {
+    tracing::info!("Fetching watched movies for search input: {}", input);
+
+    let searched_movies = MovieRepository::search_movie_by_title(&state.pool.clone(), &input)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database query error: {}", e);
+            Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+        })?
+        .into();
+
+    Ok(searched_movies)
+}
+
+pub async fn search_movies_empty(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<Movie>>, Error> {
+    let searched_movies = MovieRepository::get_top10_latest_movies(&state.pool.clone())
+        .await
+        .map_err(|e| {
+            tracing::error!("Database query error: {}", e);
+            Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+        })?
+        .into();
+    Ok(searched_movies)
 }
 
 #[derive(Deserialize)]
@@ -406,4 +439,23 @@ pub async fn get_poster(
                 Error::TokioIoError(std::io::Error::new(std::io::ErrorKind::Other, e))
             })?);
     }
+}
+
+pub async fn steal_movies(
+    State(state): State<Arc<AppState>>,
+    _auth_session: AuthSession<AuthBackendSqlite>,
+) -> Result<impl IntoResponse, Error> {
+    let steal = StealMoviesData {}.render().map_err(|e| {
+        tracing::error!("Template rendering error: {}", e);
+        Error::Status(StatusCode::INTERNAL_SERVER_ERROR)
+    })?;
+    Ok(Html(steal))
+}
+
+pub async fn search_tmdb_by_title(
+    Path(title): Path<String>,
+) -> Result<Json<Vec<TmdbSearchResult>>, Error> {
+    tracing::info!("Searching TMDb for title: {}", title);
+    let movies = MovieService::search_tmdb_by_title(&title).await?;
+    Ok(Json(movies))
 }

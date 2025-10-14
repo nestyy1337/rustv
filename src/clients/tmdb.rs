@@ -1,6 +1,9 @@
 use axum::body::Bytes;
 
-use crate::{models::imdb_stuff::TmdbMovie, shared::error::Error};
+use crate::{
+    models::imdb_stuff::{TmdbMovie, TmdbSearchResult},
+    shared::error::Error,
+};
 
 pub struct TmdbClient {
     pub api_key: String,
@@ -57,5 +60,28 @@ impl TmdbClient {
             tracing::info!("No poster available for movie {}", movie.title);
         }
         Err(Error::MovieNotFound)
+    }
+
+    pub async fn search_by_title(&self, title: &str) -> Result<Vec<TmdbSearchResult>, Error> {
+        let url = format!("{}/search/movie", self.base_url);
+        tracing::info!("Searching for movies with title: {}", title);
+        let client = reqwest::Client::new();
+        let res = client
+            .get(&url)
+            .query(&[("api_key", &self.api_key), ("query", &title.to_string())])
+            .send()
+            .await?;
+        let text = res.text().await?;
+        println!("Response text: {}", text);
+        let search_result: serde_json::Value = serde_json::from_str(&text)?;
+        println!("Search result JSON: {:?}", search_result);
+        let movies = if let Some(results) = search_result.get("results") {
+            println!("Results field: {:?}", results);
+            serde_json::from_value::<Vec<TmdbSearchResult>>(results.clone())?
+        } else {
+            vec![]
+        };
+        tracing::info!("Found {} movies matching title '{}'", movies.len(), title);
+        Ok(movies)
     }
 }

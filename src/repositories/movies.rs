@@ -79,4 +79,23 @@ impl MovieRepository {
 
         Ok(movies)
     }
+
+    pub async fn search_movie_by_title(
+        pool: &Pool<Sqlite>,
+        title: &str,
+    ) -> Result<Vec<Movie>, sqlx::Error> {
+        let pattern = format!("%{}%", title);
+        let movies = sqlx::query_as::<_, Movie>(
+            r#"
+            SELECT * FROM movies
+            WHERE title LIKE ?
+            ORDER BY release_year DESC
+            "#,
+        )
+        .bind(pattern)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(movies)
+    }
 }

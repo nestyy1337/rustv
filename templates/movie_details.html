@@ -17,7 +17,7 @@ Directed by {{ movie.director }} • {{ movie.release_year }} • {{ movie.genre
         <div class="md:col-span-1">
             <div class="aspect-[2/3] bg-gradient-to-br from-primary-600 to-accent-purple rounded-lg overflow-hidden flex items-center justify-center">
                 <img
-                  src="/movies/{{ movie.id }}/poster"
+                  src="/api/movie/{{ movie.id }}/poster"
                   alt="{{ movie.title }} poster"
                   class="w-full h-full object-cover"
                   onerror="this.style.display='none';"
