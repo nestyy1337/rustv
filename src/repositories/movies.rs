@@ -98,4 +98,43 @@ impl MovieRepository {
 
         Ok(movies)
     }
+
+    pub async fn add_movie(movie: &Movie, pool: &Pool<Sqlite>) -> Result<i64, sqlx::Error> {
+        let id = sqlx::query!(
+            r#"
+            INSERT INTO movies (imdb_id, title,director, genre, release_year, available)
+            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(imdb_id) DO NOTHING"#,
+            movie.imdb_id,
+            movie.title,
+            movie.director,
+            movie.genre,
+            movie.release_year,
+            movie.available
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(id.last_insert_rowid())
+    }
+
+    pub async fn get_movie_by_imdb_id(
+        pool: &Pool<Sqlite>,
+        imdb_id: &str,
+    ) -> Result<Option<Movie>, sqlx::Error> {
+        let movie = sqlx::query_as::<_, Movie>("SELECT * FROM movies WHERE imdb_id = ?")
+            .bind(imdb_id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(movie)
+    }
+
+    pub async fn delete_movie_cascade(
+        pool: &Pool<Sqlite>,
+        movie_id: i64,
+    ) -> Result<(), sqlx::Error> {
+        let _ = sqlx::query!("DELETE FROM movies WHERE id = ?", movie_id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }

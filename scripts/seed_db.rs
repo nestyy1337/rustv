@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sqlx::sqlite::SqlitePool;
 
 #[tokio::main]
@@ -30,6 +32,15 @@ async fn main() -> Result<(), sqlx::Error> {
     }
     println!("✓ Inserted users");
 
+    let user_ids: Vec<(i64, String)> = sqlx::query_as("SELECT id, username FROM users")
+        .fetch_all(&pool)
+        .await?;
+
+    let username_to_id: HashMap<&str, i64> = user_ids
+        .iter()
+        .map(|(id, username)| (username.as_str(), *id))
+        .collect();
+
     let movies = vec![
         (
             "tt0111161",
@@ -37,6 +48,7 @@ async fn main() -> Result<(), sqlx::Error> {
             "Frank Darabont",
             1994,
             "Drama",
+            true,
         ),
         (
             "tt0068646",
@@ -44,6 +56,7 @@ async fn main() -> Result<(), sqlx::Error> {
             "Francis Ford Coppola",
             1972,
             "Crime",
+            true,
         ),
         (
             "tt0468569",
@@ -51,6 +64,7 @@ async fn main() -> Result<(), sqlx::Error> {
             "Christopher Nolan",
             2008,
             "Action",
+            true,
         ),
         (
             "tt0167260",
@@ -58,6 +72,7 @@ async fn main() -> Result<(), sqlx::Error> {
             "Peter Jackson",
             2003,
             "Fantasy",
+            true,
         ),
         (
             "tt0110912",
@@ -65,14 +80,23 @@ async fn main() -> Result<(), sqlx::Error> {
             "Quentin Tarantino",
             1994,
             "Crime",
+            true,
         ),
-        ("tt0137523", "Fight Club", "David Fincher", 1999, "Drama"),
+        (
+            "tt0137523",
+            "Fight Club",
+            "David Fincher",
+            1999,
+            "Drama",
+            true,
+        ),
         (
             "tt0109830",
             "Forrest Gump",
             "Robert Zemeckis",
             1994,
             "Drama",
+            true,
         ),
         (
             "tt0120737",
@@ -80,58 +104,104 @@ async fn main() -> Result<(), sqlx::Error> {
             "Peter Jackson",
             2001,
             "Fantasy",
+            true,
         ),
-        ("tt0443706", "Zodiac", "David Fincher", 2007, "Crime"),
+        ("tt0443706", "Zodiac", "David Fincher", 2007, "Crime", true),
     ];
 
-    for (imdb_id, title, director, year, genre) in movies {
+    for (imdb_id, title, director, year, genre, available) in movies {
         sqlx::query(
-            "INSERT OR IGNORE INTO movies (imdb_id, title, director, release_year, genre)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO movies (imdb_id, title, director, release_year, genre, available)
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(imdb_id)
         .bind(title)
         .bind(director)
         .bind(year)
         .bind(genre)
+        .bind(available)
         .execute(&pool)
         .await?;
     }
     println!("Inserted movies");
 
-    // we need to get the real ids of the movies
     let movie_ids: Vec<(i64, String)> = sqlx::query_as("SELECT id, imdb_id FROM movies")
         .fetch_all(&pool)
         .await?;
-    let ids = movie_ids
-        .into_iter()
-        .filter_map(|r| r.0.into())
-        .collect::<Vec<i64>>();
+
+    let imdb_to_id: HashMap<&str, i64> = movie_ids
+        .iter()
+        .map(|(id, imdb_id)| (imdb_id.as_str(), *id))
+        .collect();
 
     let reviews = vec![
-        (1, ids[0], "Absolutely brilliant masterpiece!", 9.5),
-        (1, ids[1], "Classic cinema at its finest.", 9.0),
-        (2, ids[0], "Best movie I've ever seen!", 10.0),
         (
-            2,
-            ids[2],
+            username_to_id["alice"],
+            imdb_to_id["tt0111161"],
+            "Absolutely brilliant masterpiece!",
+            9.5,
+        ),
+        (
+            username_to_id["alice"],
+            imdb_to_id["tt0068646"],
+            "Classic cinema at its finest.",
+            9.0,
+        ),
+        (
+            username_to_id["bob"],
+            imdb_to_id["tt0111161"],
+            "Best movie I've ever seen!",
+            10.0,
+        ),
+        (
+            username_to_id["bob"],
+            imdb_to_id["tt0468569"],
             "Heath Ledger's performance is unforgettable.",
             9.8,
         ),
-        (3, ids[3], "Epic trilogy conclusion!", 9.2),
-        (3, ids[4], "Tarantino's genius on full display.", 8.9),
-        (4, ids[0], "Absolutely brilliant masterpiece!", 9.5),
-        (4, ids[2], "Classic cinema at its finest.", 9.0),
         (
-            4,
-            ids[3],
+            username_to_id["charlie"], // Fixed typo
+            imdb_to_id["tt0167260"],
+            "Epic trilogy conclusion!",
+            9.2,
+        ),
+        (
+            username_to_id["charlie"], // Fixed typo
+            imdb_to_id["tt0110912"],
+            "Tarantino's genius on full display.",
+            8.9,
+        ),
+        (
+            username_to_id["alice"],
+            imdb_to_id["tt0111161"],
+            "Absolutely brilliant masterpiece!",
+            9.5,
+        ),
+        (
+            username_to_id["alice"],
+            imdb_to_id["tt0468569"],
+            "Classic cinema at its finest.",
+            9.0,
+        ),
+        (
+            username_to_id["bob"],
+            imdb_to_id["tt0167260"],
             "Heath Ledger's performance is unforgettable.",
             9.8,
         ),
-        (4, ids[3], "Epic trilogy conclusion!", 9.2),
-        (4, ids[4], "Tarantino's genius on full display.", 8.9),
+        (
+            username_to_id["charlie"], // Fixed typo
+            imdb_to_id["tt0167260"],
+            "Epic trilogy conclusion!",
+            9.2,
+        ),
+        (
+            username_to_id["charlie"], // Fixed typo
+            imdb_to_id["tt0110912"],
+            "Tarantino's genius on full display.",
+            8.9,
+        ),
     ];
-
     for (user_id, movie_id, content, rating) in reviews {
         sqlx::query(
             "INSERT OR IGNORE INTO reviews (user_id, movie_id, content, rating)
@@ -147,16 +217,16 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("Inserted reviews");
 
     let watchlist = vec![
-        (1, ids[2]),
-        (1, ids[3]),
-        (2, ids[4]),
-        (3, ids[0]),
-        (3, ids[1]),
-        (4, ids[0]),
-        (4, ids[1]),
-        (4, ids[2]),
-        (4, ids[3]),
-        (4, ids[4]),
+        (username_to_id["alice"], imdb_to_id["tt0468569"]),
+        (username_to_id["alice"], imdb_to_id["tt0167260"]),
+        (username_to_id["bob"], imdb_to_id["tt0110912"]),
+        (username_to_id["charlie"], imdb_to_id["tt0111161"]),
+        (username_to_id["charlie"], imdb_to_id["tt0068646"]),
+        (username_to_id["alice"], imdb_to_id["tt0111161"]),
+        (username_to_id["alice"], imdb_to_id["tt0068646"]),
+        (username_to_id["alice"], imdb_to_id["tt0468569"]),
+        (username_to_id["alice"], imdb_to_id["tt0167260"]),
+        (username_to_id["alice"], imdb_to_id["tt0110912"]),
     ];
     for (user_id, movie_id) in watchlist {
         sqlx::query(
@@ -171,17 +241,21 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("Inserted watchlist entries");
 
     let watched = vec![
-        (1, ids[0], Some(9.5)),
-        (1, ids[1], Some(9.0)),
-        (2, ids[0], Some(10.0)),
-        (2, ids[2], Some(9.8)),
-        (3, ids[3], Some(9.2)),
-        (3, ids[4], None),
-        (4, ids[0], Some(9.5)),
-        (4, ids[1], Some(9.0)),
-        (4, ids[2], Some(9.8)),
-        (4, ids[3], Some(9.2)),
-        (4, ids[4], Some(8.9)),
+        (username_to_id["alice"], imdb_to_id["tt0111161"], Some(9.5)),
+        (username_to_id["alice"], imdb_to_id["tt0068646"], Some(9.0)),
+        (username_to_id["bob"], imdb_to_id["tt0111161"], Some(10.0)),
+        (username_to_id["bob"], imdb_to_id["tt0468569"], Some(9.8)),
+        (
+            username_to_id["charlie"],
+            imdb_to_id["tt0167260"],
+            Some(9.2),
+        ),
+        (username_to_id["charlie"], imdb_to_id["tt0110912"], None),
+        (username_to_id["alice"], imdb_to_id["tt0111161"], Some(9.5)),
+        (username_to_id["alice"], imdb_to_id["tt0068646"], Some(9.0)),
+        (username_to_id["alice"], imdb_to_id["tt0468569"], Some(9.8)),
+        (username_to_id["alice"], imdb_to_id["tt0167260"], Some(9.2)),
+        (username_to_id["alice"], imdb_to_id["tt0110912"], Some(8.9)),
     ];
     for (user_id, movie_id, rating) in watched {
         sqlx::query(

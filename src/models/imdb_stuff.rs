@@ -38,10 +38,25 @@ impl TmdbMovie {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Genre {
     pub id: i32,
     pub name: String,
+}
+
+impl Default for Genre {
+    fn default() -> Self {
+        Genre {
+            id: 0,
+            name: "Unknown".to_string(),
+        }
+    }
+}
+
+impl Genre {
+    pub fn to_string(&self) -> String {
+        self.name.clone()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

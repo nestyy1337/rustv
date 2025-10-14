@@ -79,6 +79,7 @@ impl axum::response::IntoResponse for Error {
             Error::SessionFlushFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Error::SessionClearFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Error::Generic(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
+            Error::MovieNotFound => (StatusCode::NOT_FOUND, self.to_string()),
             Error::TaskJoin(e) => {
                 tracing::error!("Task join error: {}", e);
                 (

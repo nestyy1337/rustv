@@ -10,9 +10,16 @@ impl WatchlistRepository {
         pool: &Pool<Sqlite>,
         user_id: i64,
     ) -> Result<Vec<Watchlist>, sqlx::Error> {
+        // SELECT wm.id, m.imdb_id, wm.user_id, wm.movie_id, m.title, m.genre, m.release_year as year, wm.watched_at, wm.rating
+        // FROM watched_movies wm
+        // INNER JOIN movies m ON wm.movie_id = m.id
+        // WHERE wm.user_id = ?
+        // ORDER BY wm.watched_at DESC
         sqlx::query_as!(
             Watchlist,
-            r#"SELECT id as "id!", user_id as "user_id!", movie_id as "movie_id!", added_at FROM watchlist WHERE user_id = ?"#,
+            r#"SELECT w.id as "id!", w.user_id as "user_id!", w.movie_id as "movie_id!", m.available as available, w.added_at FROM watchlist w
+            INNER JOIN movies m ON w.movie_id = m.id
+            WHERE user_id = ?"#,
             user_id
         )
         .fetch_all(pool)
@@ -56,5 +63,19 @@ impl WatchlistRepository {
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn is_watchlisted_anywhere(
+        pool: &Pool<Sqlite>,
+        movie_id: i64,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query!(
+            "SELECT * FROM watchlist WHERE movie_id = ? LIMIT 1",
+            movie_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        Ok(result.is_some())
     }
 }

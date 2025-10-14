@@ -4,7 +4,7 @@ use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::middleware::{from_fn, Next};
 use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::routing::delete;
+use axum::routing::{delete, post};
 use sqlx::Pool;
 use std::{marker::PhantomData, net::Ipv4Addr, sync::Arc};
 use time::OffsetDateTime;
@@ -19,9 +19,10 @@ use tokio::net::TcpListener;
 
 use crate::auth;
 use crate::handlers::movies::{
-    add_watched_movie, delete_watched_movie, delete_watchlisted_movie, get_movie_details,
-    get_movie_details_json, get_poster, get_watched_movies_page, search_movies,
-    search_movies_empty, search_tmdb_by_title, steal_movies, stream_video, test_player,
+    add_watched_movie, delete_requested_movie, delete_watched_movie, delete_watchlisted_movie,
+    get_movie_details, get_movie_details_json, get_poster, get_watched_movies_page, request_movie,
+    search_movies, search_movies_empty, search_tmdb_by_title, steal_movies, stream_video,
+    test_player,
 };
 use crate::handlers::profile::get_profile_page;
 use crate::handlers::watchlist::{add_watchlist_movie, get_watchlist_page};
@@ -273,6 +274,10 @@ impl App {
             .route("/movie/{movie_id}", get(get_movie_details_json))
             .route("/movie/search/{input}", get(search_movies))
             .route("/movie/search/", get(search_movies_empty))
+            .route(
+                "/movie/request",
+                post(request_movie).delete(delete_requested_movie),
+            )
             .route("/movie/tmdb/search/{title}", get(search_tmdb_by_title))
             .route("/movie/{movie_id}/poster", get(get_poster));
 

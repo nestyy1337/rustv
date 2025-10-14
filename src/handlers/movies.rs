@@ -1,5 +1,6 @@
 use askama::Template;
 use serde::Deserialize;
+use serde_json::Value;
 use std::sync::Arc;
 
 use axum::{
@@ -16,11 +17,12 @@ use crate::{
     clients::tmdb::TmdbClient,
     models::{
         imdb_stuff::{TmdbMovie, TmdbSearchResult},
-        movie::{Movie, WatchedMovie},
+        movie::{Movie, WatchedMovie, Watchlist},
     },
     repositories::{
         movies::MovieRepository,
         users::{UserProfileRepository, UserRepository},
+        watchlist::WatchlistRepository,
     },
     services::{
         movies::MovieService,
@@ -329,7 +331,24 @@ pub async fn stream_video(
     // drop(session_guard);
 
     tracing::info!("Received request to stream movie ID: {}", movie_id);
-    let file_size = StreamingService::file_size(&state.pool, movie_id).await?;
+    let file_size = StreamingService::file_size(&state.pool, movie_id).await;
+    let file_size = match file_size {
+        Ok(size) => size,
+        Err(e) => match e {
+            Error::MovieNotFound => {
+                tracing::error!("Movie ID {} not found", movie_id);
+                return Err(Error::MovieNotFound);
+            }
+            _ => {
+                tracing::error!(
+                    "Error retrieving file size for movie ID {}: {}",
+                    movie_id,
+                    e
+                );
+                return Err(Error::Status(StatusCode::INTERNAL_SERVER_ERROR));
+            }
+        },
+    };
     tracing::info!("File size for movie ID {}: {}", movie_id, file_size);
 
     let raw_range = headers
@@ -458,4 +477,68 @@ pub async fn search_tmdb_by_title(
     tracing::info!("Searching TMDb for title: {}", title);
     let movies = MovieService::search_tmdb_by_title(&title).await?;
     Ok(Json(movies))
+}
+
+#[derive(Deserialize)]
+pub struct RequestMoviePayload {
+    pub tmdb_id: String,
+}
+
+pub async fn request_movie(
+    State(state): State<Arc<AppState>>,
+    _auth_session: AuthSession<AuthBackendSqlite>,
+    Json(payload): Json<RequestMoviePayload>,
+) -> Result<impl IntoResponse, Error> {
+    let session_guard = _auth_session.inner.lock().await;
+    let user_id = session_guard
+        .user_id()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
+    drop(session_guard);
+
+    let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
+    let tmdb_movie = client.get_movie_details(&payload.tmdb_id).await?;
+    tracing::info!("Fetched movie details from TMDb: {:?}", tmdb_movie);
+
+    let id = MovieService::add_movie(&tmdb_movie, &state.pool.clone()).await?;
+
+    WatchlistService::add_watchlsited_movie(user_id, id, state.pool.clone()).await?;
+
+    Ok(Json(
+        serde_json::json!({"status": "success", "movie_id": id}),
+    ))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteRequestMoviePayload {
+    pub movie_id: i64,
+}
+
+pub async fn delete_requested_movie(
+    State(state): State<Arc<AppState>>,
+    _auth_session: AuthSession<AuthBackendSqlite>,
+    Json(payload): Json<DeleteRequestMoviePayload>,
+) -> Result<Json<Value>, Error> {
+    let session_guard = _auth_session.inner.lock().await;
+    let user_id = session_guard
+        .user_id()
+        .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
+    drop(session_guard);
+
+    WatchlistService::delete_watchlisted_movie(payload.movie_id, user_id, state.pool.clone())
+        .await?;
+
+    if WatchlistRepository::is_watchlisted_anywhere(&state.pool.clone(), payload.movie_id).await? {
+        tracing::info!(
+            "Movie ID {} is still watchlisted by other users, not deleting",
+            payload.movie_id
+        );
+        return Ok(Json(
+            serde_json::json!({"status": "success", "movie_id": payload.movie_id}),
+        ));
+    }
+
+    MovieService::delete_movie(payload.movie_id, &state.pool.clone()).await?;
+    Ok(Json(
+        serde_json::json!({"status": "success", "movie_id": payload.movie_id}),
+    ))
 }

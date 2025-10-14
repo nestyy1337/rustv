@@ -4,6 +4,7 @@ use crate::{
     clients::tmdb::TmdbClient,
     models::{
         imdb_stuff::{TmdbMovie, TmdbSearchResult},
+        movie::Movie,
         users::User,
     },
     repositories::movies::MovieRepository,
@@ -117,5 +118,28 @@ impl MovieService {
         let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
         let movies = client.search_by_title(title).await?;
         Ok(movies)
+    }
+
+    pub async fn add_movie(tmdb_movie: &TmdbMovie, pool: &Pool<Sqlite>) -> Result<i64, Error> {
+        let movie = Movie::from(tmdb_movie);
+        let id = MovieRepository::add_movie(&movie, pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database error: {}", e);
+                Error::DatabaseError(e)
+            })?;
+        Ok(id)
+    }
+
+    pub async fn delete_movie(movie_id: i64, pool: &Pool<Sqlite>) -> Result<(), Error> {
+        let _ = sqlx::query!("DELETE FROM movies WHERE id = ?", movie_id)
+            .execute(pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database error: {}", e);
+                Error::DatabaseError(e)
+            })?;
+        tracing::info!("Deleted movie with ID {} from database", movie_id);
+        Ok(())
     }
 }
