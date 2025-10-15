@@ -17,7 +17,7 @@ pub struct MovieService;
 impl MovieService {
     pub async fn find_watched_movies_by_username(
         user: &User,
-        pool: Pool<Sqlite>,
+        pool: &Pool<Sqlite>,
     ) -> Result<Option<Vec<WatchedMovieDetailed>>, Error> {
         let movies = MovieRepository::find_watched_movies_by_username(user, pool.clone()).await;
 
@@ -28,14 +28,20 @@ impl MovieService {
         );
 
         let movies = match movies {
-            Ok(movies) => movies,
+            Ok(movies) => {
+                if movies.clone().expect("Checked above").is_empty() {
+                    None
+                } else {
+                    movies
+                }
+            }
             Err(e) => {
                 tracing::error!("Database error: {}", e);
                 return Err(Error::DatabaseError(e));
             }
         };
 
-        Ok(movies)
+        return Ok(movies);
     }
 
     pub async fn is_watchlisted(
@@ -91,7 +97,7 @@ impl MovieService {
         let now = chrono::Utc::now();
 
         let _ = sqlx::query!(
-            "INSERT INTO watched_movies (user_id, movie_id, watched_at, rating) VALUES (?,?,?,?)",
+            "INSERT INTO watched_movies (user_id, movie_id, watched_at, rating) VALUES (?,?,?,?) ON CONFLICT(user_id, movie_id) DO UPDATE SET watched_at=excluded.watched_at, rating=excluded.rating",
             user_id,
             movie_id,
             now,
@@ -132,13 +138,18 @@ impl MovieService {
     }
 
     pub async fn delete_movie(movie_id: i64, pool: &Pool<Sqlite>) -> Result<(), Error> {
-        let _ = sqlx::query!("DELETE FROM movies WHERE id = ?", movie_id)
+        let result = sqlx::query!("DELETE FROM movies WHERE id = ?", movie_id)
             .execute(pool)
             .await
             .map_err(|e| {
                 tracing::error!("Database error: {}", e);
                 Error::DatabaseError(e)
             })?;
+        if result.rows_affected() == 0 {
+            tracing::warn!("No movie found with ID {} to delete", movie_id);
+            return Err(Error::DatabaseError(sqlx::Error::RowNotFound));
+        }
+
         tracing::info!("Deleted movie with ID {} from database", movie_id);
         Ok(())
     }

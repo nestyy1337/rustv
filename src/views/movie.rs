@@ -12,7 +12,7 @@ pub struct WatchedMovieData {
     pub movies: Vec<WatchedMovieDetailed>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct WatchedMovieDetailed {
     pub id: i64,
     pub imdb_id: Option<String>,

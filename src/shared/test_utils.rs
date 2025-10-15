@@ -16,7 +16,7 @@ static INIT: Once = Once::new();
 pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
     INIT.call_once(|| {
         let mut instrumentation = crate::shared::logging::Instrumentation::default();
-        instrumentation.verbose = 2;
+        instrumentation.verbose = 0;
         instrumentation
             .setup()
             .expect("Failed to setup instrumentation");
@@ -43,27 +43,9 @@ pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
         .await
         .expect("Failed to run migrations");
 
-    let some_date = DateTime::from_timestamp(1415923200, 0).expect("Failed to create test date");
+    let test_valid_user = test_user();
 
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password("hunter42".as_bytes(), &salt)
-        .map_err(|_| Error::PasswordHashFailed)?
-        .to_string();
-
-    let test_valid_user = User {
-        id: 1,
-        username: "ferris".to_string(),
-        email: "ferris@gmail.com".to_string(),
-        password_hash,
-        display_name: None,
-        is_admin: false,
-        created_at: some_date,
-        updated_at: some_date,
-    };
-
-    let _ = sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, User>(
         "INSERT INTO users (username, email, password_hash, display_name, is_admin, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
          RETURNING *",
@@ -84,6 +66,8 @@ pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
             e.into()
         }
     });
+
+    println!("USER ID: {:?}", user.as_ref().map(|u| u.id));
     let address = app.address().expect("Failed to get app address");
 
     let return_clone = db_pool.clone();
@@ -94,4 +78,28 @@ pub async fn setup_test_app() -> Result<(String, Pool<Sqlite>)> {
 
     let address = format!("http://{}", address);
     Ok((address, return_clone))
+}
+
+pub fn test_user() -> User {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let password_hash = argon2
+        .hash_password("hunter42".as_bytes(), &salt)
+        .map_err(|_| Error::PasswordHashFailed)
+        .unwrap()
+        .to_string();
+
+    let some_date = DateTime::from_timestamp(1415923200, 0).expect("Failed to create test date");
+    let test_valid_user = User {
+        id: 1,
+        username: "ferris".to_string(),
+        email: "ferris@gmail.com".to_string(),
+        password_hash,
+        display_name: None,
+        is_admin: false,
+        created_at: some_date,
+        updated_at: some_date,
+    };
+
+    test_valid_user
 }

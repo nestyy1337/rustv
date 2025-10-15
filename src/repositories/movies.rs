@@ -10,8 +10,8 @@ pub struct MovieRepository;
 
 impl MovieRepository {
     pub async fn get_movie_by_id(
-        pool: &Pool<Sqlite>,
         movie_id: i64,
+        pool: &Pool<Sqlite>,
     ) -> Result<Option<Movie>, sqlx::Error> {
         let movie = sqlx::query_as::<_, Movie>("SELECT * FROM movies WHERE id = ?")
             .bind(movie_id)
@@ -103,7 +103,7 @@ impl MovieRepository {
         let id = sqlx::query!(
             r#"
             INSERT INTO movies (imdb_id, title,director, genre, release_year, available)
-            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(imdb_id) DO NOTHING"#,
+            VALUES (?, ?, ?, ?, ?, ?)"#,
             movie.imdb_id,
             movie.title,
             movie.director,

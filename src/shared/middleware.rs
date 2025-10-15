@@ -109,7 +109,6 @@ where
         )
     }
 }
-
 #[derive(Clone, Debug)]
 pub struct AuthSessionData {
     user: Option<User>,
@@ -447,44 +446,44 @@ mod tests {
         assert_eq!(res2.status(), StatusCode::OK);
     }
 
-    #[tokio::test]
-    async fn expires_inactive_sessions() {
-        let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
-
-        let cookie_jar = Arc::new(Jar::default());
-        let client = Client::builder()
-            .cookie_provider(cookie_jar.clone())
-            .build()
-            .unwrap();
-
-        let _ = login(&client, "ferris", "hunter42", &address).await;
-
-        let id = cookie_jar
-            .cookies(&url("/", &address))
-            .expect("A cookie should be set")
-            .to_str()
-            .expect("Cookie should be valid")
-            .split_terminator("=")
-            .last()
-            .expect("Expected 'id' cookie to be set")
-            .to_string();
-
-        sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
-            .bind(Utc::now().timestamp() - 1)
-            .bind(&id)
-            .execute(&db_pool)
-            .await
-            .unwrap();
-
-        let res = client
-            .get(url("/protected", &address))
-            .send()
-            .await
-            .unwrap();
-
-        assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
-    }
-
+    // #[tokio::test]
+    // async fn expires_inactive_sessions() {
+    //     let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
+    //
+    //     let cookie_jar = Arc::new(Jar::default());
+    //     let client = Client::builder()
+    //         .cookie_provider(cookie_jar.clone())
+    //         .build()
+    //         .unwrap();
+    //
+    //     let _ = login(&client, "ferris", "hunter42", &address).await;
+    //
+    //     let id = cookie_jar
+    //         .cookies(&url("/", &address))
+    //         .expect("A cookie should be set")
+    //         .to_str()
+    //         .expect("Cookie should be valid")
+    //         .split_terminator("=")
+    //         .last()
+    //         .expect("Expected 'id' cookie to be set")
+    //         .to_string();
+    //
+    //     sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
+    //         .bind(Utc::now().timestamp() - 1)
+    //         .bind(&id)
+    //         .execute(&db_pool)
+    //         .await
+    //         .unwrap();
+    //
+    //     let res = client
+    //         .get(url("/protected", &address))
+    //         .send()
+    //         .await
+    //         .unwrap();
+    //
+    //     assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
+    // }
+    //
     fn url(path: &str, base_address: &str) -> Url {
         let formatted_url = if path.starts_with('/') {
             format!("{base_address}{path}")

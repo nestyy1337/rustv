@@ -250,10 +250,6 @@ impl App {
             .route("/", get(root))
             .route("/profile/{username}", get(get_profile_page))
             .route("/watched/{username}", get(get_watched_movies_page))
-            .route(
-                "/watched/{username}/{movie_id}",
-                delete(delete_watched_movie).post(add_watched_movie),
-            )
             .route_layer(from_fn(require_auth_redirect));
 
         let session_layer = SessionManagerLayer::new(session_store)
@@ -277,6 +273,10 @@ impl App {
             .route(
                 "/movie/request",
                 post(request_movie).delete(delete_requested_movie),
+            )
+            .route(
+                "/watched/{username}/{movie_id}",
+                delete(delete_watched_movie).post(add_watched_movie),
             )
             .route("/movie/tmdb/search/{title}", get(search_tmdb_by_title))
             .route("/movie/{movie_id}/poster", get(get_poster));

@@ -71,6 +71,7 @@ pub fn router() -> Router<Arc<AppState>> {
 mod post {
     use crate::{
         models::users::Credentials,
+        repositories::users::UserRepository,
         shared::middleware::{AuthBackendSqlite, AuthSession},
     };
     use std::sync::Arc;
@@ -148,7 +149,7 @@ mod post {
 
         let user: User = form.into();
 
-        match add_user_test_to_db(&user, password, state.pool.clone()).await {
+        match UserRepository::add_user(&user, password, &state.pool).await {
             Ok(user) => user,
             Err(Error::UsernameExists) => {
                 return redirect_to_register_with_next(next);
@@ -158,7 +159,7 @@ mod post {
             }
         };
 
-        // Auto-login after successful registration
+        // auto-login after successful registration
         if auth_session.login(user).await.is_err() {
             return redirect_to_register_with_next(next);
         }
@@ -201,39 +202,4 @@ fn redirect_to_register_with_next(next: Option<String>) -> Response<axum::body::
         register_url = format!("{register_url}?next={next}");
     }
     Redirect::to(&register_url).into_response()
-}
-
-async fn add_user_test_to_db(
-    user: &User,
-    password: String,
-    pool: SqlitePool,
-) -> Result<User, Error> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|_| Error::PasswordHashFailed)?
-        .to_string();
-
-    sqlx::query_as::<_, User>(
-        "INSERT INTO users (username, email, password_hash, display_name, is_admin, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         RETURNING *",
-    )
-    .bind(&user.username)        // Individual field
-    .bind(&user.email)           // Individual field
-    .bind(&password_hash)        // Computed hash
-    .bind(&user.display_name)    // Individual field
-    .bind(user.is_admin)         // Individual field
-    .bind(user.created_at)       // Individual field
-    .bind(user.updated_at)       // Individual field
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| {
-        if e.to_string().contains("UNIQUE constraint failed") {
-            Error::UsernameExists
-        } else {
-            e.into()
-        }
-    })
 }

@@ -1,3 +1,7 @@
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHasher,
+};
 use sqlx::{Pool, Sqlite};
 
 use crate::{
@@ -16,6 +20,41 @@ impl UserRepository {
             .bind(username)
             .fetch_optional(pool)
             .await
+    }
+
+    pub async fn add_user(
+        user: &User,
+        password: String,
+        pool: &Pool<Sqlite>,
+    ) -> Result<User, Error> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|_| Error::PasswordHashFailed)?
+            .to_string();
+
+        sqlx::query_as::<_, User>(
+        "INSERT INTO users (username, email, password_hash, display_name, is_admin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         RETURNING *",
+    )
+    .bind(&user.username)
+    .bind(&user.email)
+    .bind(&password_hash)
+    .bind(&user.display_name)
+    .bind(user.is_admin)
+    .bind(user.created_at)
+    .bind(user.updated_at)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        if e.to_string().contains("UNIQUE constraint failed") {
+            Error::UsernameExists
+        } else {
+            e.into()
+        }
+    })
     }
 }
 

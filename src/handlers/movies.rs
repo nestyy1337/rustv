@@ -1,5 +1,5 @@
 use askama::Template;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -46,7 +46,7 @@ pub async fn get_movie_details(
     let user_id = session_guard
         .user_id()
         .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
-    let movie = MovieRepository::get_movie_by_id(&state.pool.clone(), movie_id)
+    let movie = MovieRepository::get_movie_by_id(movie_id, &state.pool)
         .await?
         .ok_or(Error::MovieNotFound)?;
 
@@ -85,7 +85,7 @@ pub async fn get_movie_details_json(
     Path(movie_id): Path<i64>,
 ) -> Result<Json<Movie>, Error> {
     tracing::info!("Fetching details for movie ID: {}", movie_id);
-    let movie = MovieRepository::get_movie_by_id(&state.pool, movie_id)
+    let movie = MovieRepository::get_movie_by_id(movie_id, &state.pool)
         .await?
         .ok_or(Error::Status(StatusCode::NOT_FOUND))?;
 
@@ -145,9 +145,9 @@ pub async fn search_movies_empty(
     Ok(searched_movies)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct DeleteWatchlistPayload {
-    movie_id: i64,
+    pub movie_id: i64,
 }
 
 pub async fn delete_watchlisted_movie(
@@ -419,7 +419,7 @@ pub async fn get_poster(
     Path(movie_id): Path<i64>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, Error> {
-    let movie = MovieRepository::get_movie_by_id(&state.pool, movie_id)
+    let movie = MovieRepository::get_movie_by_id(movie_id, &state.pool)
         .await?
         .ok_or(Error::MovieNotFound)?;
     let file_path = format!("movies/{}_poster.jpg", movie_id);

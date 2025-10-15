@@ -29,7 +29,7 @@ async fn get_movie_path(movie_id: i64, pool: &Pool<Sqlite>) -> Result<PathBuf, E
         })?
         .join("movies");
 
-    let movie = MovieRepository::get_movie_by_id(pool, movie_id)
+    let movie = MovieRepository::get_movie_by_id(movie_id, pool)
         .await?
         .ok_or(Error::MovieNotFound)?;
 
