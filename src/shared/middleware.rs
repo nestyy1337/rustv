@@ -224,10 +224,8 @@ impl AuthSession<AuthBackendSqlite> {
             }
         } else {
             tracing::warn!("No user found in session");
-            // we should create a guest user here if needed
+            //TODO: we should create a guest user here if needed
             data = UserAuthData::default();
-            session.clear().await;
-            session.flush().await.map_err(|e| e.to_string())?;
             user = None;
         }
 

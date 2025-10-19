@@ -5,6 +5,7 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use backend::shared::test_utils::setup_test_app;
+    use chrono::Utc;
     use reqwest::{
         cookie::{CookieStore, Jar},
         Client, StatusCode, Url,
@@ -163,44 +164,65 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn expires_inactive_sessions() {
-    //     let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
-    //
-    //     let cookie_jar = Arc::new(Jar::default());
-    //     let client = Client::builder()
-    //         .cookie_provider(cookie_jar.clone())
-    //         .build()
-    //         .unwrap();
-    //
-    //     let _ = login(&client, "ferris", "hunter42", &address).await;
-    //
-    //     let id = cookie_jar
-    //         .cookies(&url("/", &address))
-    //         .expect("A cookie should be set")
-    //         .to_str()
-    //         .expect("Cookie should be valid")
-    //         .split_terminator("=")
-    //         .last()
-    //         .expect("Expected 'id' cookie to be set")
-    //         .to_string();
-    //
-    //     sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
-    //         .bind(Utc::now().timestamp() - 1)
-    //         .bind(&id)
-    //         .execute(&db_pool)
-    //         .await
-    //         .unwrap();
-    //
-    //     let res = client
-    //         .get(url("/protected", &address))
-    //         .send()
-    //         .await
-    //         .unwrap();
-    //
-    //     assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
-    // }
-    //
+    #[tokio::test]
+    async fn expires_inactive_sessions() {
+        let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        let _ = login(&client, "ferris", "hunter42", &address).await;
+
+        let id = cookie_jar
+            .cookies(&url("/", &address))
+            .expect("A cookie should be set")
+            .to_str()
+            .expect("Cookie should be valid")
+            .split_terminator("=")
+            .last()
+            .expect("Expected 'id' cookie to be set")
+            .to_string();
+
+        sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
+            .bind(Utc::now().timestamp() - 1)
+            .bind(&id)
+            .execute(&db_pool)
+            .await
+            .unwrap();
+
+        let res = client
+            .get(url("/protected", &address))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
+    }
+
+    #[tokio::test]
+    async fn login_creates_session_with_new_id() {
+        let (address, _) = setup_test_app().await.unwrap();
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        client.get(url("/", &address)).send().await.unwrap();
+        assert!(
+            cookie_jar.cookies(&url("/", &address)).is_none(),
+            "Guest should have no session cookie"
+        );
+
+        login(&client, "ferris", "hunter42", &address).await;
+
+        let session_id = extract_session_id(&cookie_jar, &address);
+        assert!(!session_id.is_empty(), "Login should create session");
+    }
+
     fn url(path: &str, base_address: &str) -> Url {
         let formatted_url = if path.starts_with('/') {
             format!("{base_address}{path}")
