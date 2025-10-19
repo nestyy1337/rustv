@@ -248,6 +248,7 @@ impl App {
 
         let protected_route = Router::new()
             .route("/", get(root))
+            .route("/protected", get(root))
             .route("/profile/{username}", get(get_profile_page))
             .route("/watched/{username}", get(get_watched_movies_page))
             .route_layer(from_fn(require_auth_redirect));

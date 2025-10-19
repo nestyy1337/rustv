@@ -54,7 +54,7 @@ pub async fn add_watchlist_movie(
     let movie_id = payload.movie_id;
     tracing::info!(movie_id, user_id, "Adding a new watchlisted movie for user");
     let result =
-        WatchlistService::add_watchlsited_movie(user_id, movie_id, state.pool.clone()).await;
+        WatchlistService::add_watchlsited_movie(user_id, movie_id, &state.pool.clone()).await;
     match result {
         Err(e) => match e {
             Error::Generic(msg) => {
@@ -99,5 +99,5 @@ pub async fn delete_watchlist_item(
         .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
     drop(session_guard);
 
-    WatchlistService::remove_from_watchlist(&state.pool, user_id, movie_id).await
+    WatchlistService::remove_from_watchlist(user_id, movie_id, &state.pool).await
 }

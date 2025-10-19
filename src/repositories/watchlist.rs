@@ -55,7 +55,7 @@ impl WatchlistRepository {
         let now = chrono::Utc::now();
 
         let _ = sqlx::query!(
-            "INSERT INTO watchlist (user_id, movie_id, added_at) VALUES (?,?,?) ON CONFLICT(user_id, movie_id) DO NOTHING",
+            "INSERT INTO watchlist (user_id, movie_id, added_at) VALUES (?,?,?)",
             user_id,
             movie_id,
             now

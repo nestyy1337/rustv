@@ -87,7 +87,14 @@ where
                             "could not create auth session from session"
                         );
                         let mut res = Response::default();
-                        *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
+                        // *res.status_mut() = http::StatusCode::INTERNAL_SERVER_ERROR;
+                        //we redirect to login instead
+                        *res.status_mut() = http::StatusCode::SEE_OTHER;
+                        res.headers_mut().insert(
+                            http::header::LOCATION,
+                            http::HeaderValue::from_static("/login"),
+                        );
+
                         return Ok(res);
                     }
                 };
@@ -211,11 +218,17 @@ impl AuthSession<AuthBackendSqlite> {
             if !session_verified {
                 debug!("Session auth hash does not match user auth hash, resetting session data");
                 data = UserAuthData::default();
+                session.clear().await;
                 session.flush().await.map_err(|e| e.to_string())?;
                 user = None;
             }
         } else {
             tracing::warn!("No user found in session");
+            // we should create a guest user here if needed
+            data = UserAuthData::default();
+            session.clear().await;
+            session.flush().await.map_err(|e| e.to_string())?;
+            user = None;
         }
 
         let inner = Arc::new(Mutex::new(AuthSessionData {
@@ -244,14 +257,11 @@ impl AuthSession<AuthBackendSqlite> {
         let mut inner = self.inner.lock().await;
         let auth_hash = user.session_auth_hash().to_vec();
 
-        if inner.data.auth_hash.is_none() {
-            debug!("Session auth hash is None, setting it for the first time");
-            inner
-                .session
-                .cycle_id()
-                .await
-                .map_err(|_| Error::SessionNotFound)?;
-        }
+        inner
+            .session
+            .cycle_id()
+            .await
+            .map_err(|_| Error::SessionNotFound)?;
         inner.data.user = user.id;
         inner.data.auth_hash = Some(auth_hash);
         drop(inner);
@@ -356,157 +366,4 @@ pub fn verify_password(password: impl AsRef<[u8]>, hash: &str) -> Result<(), Err
     parsed_hash
         .verify_password(verifier, password.as_ref())
         .map_err(|_| Error::PasswordVerificationFailed)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{collections::HashMap, sync::Arc};
-
-    use chrono::Utc;
-    use reqwest::{
-        cookie::{CookieStore, Jar},
-        Client, StatusCode, Url,
-    };
-
-    use crate::shared::test_utils::setup_test_app;
-
-    #[tokio::test]
-    async fn test1() {
-        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
-
-        let cookie_jar = Arc::new(Jar::default());
-        let client = Client::builder()
-            .cookie_provider(cookie_jar.clone())
-            .build()
-            .unwrap();
-
-        let res = client.get(url("/", &address)).send().await.unwrap();
-        assert_eq!(
-            *res.url(),
-            url("/login?next=%2F", &address),
-            "Expected redirect to /login after accessing root without authentication"
-        );
-        assert_eq!(res.status(), StatusCode::OK);
-
-        // Log in with invalid credentials.
-        let res = login(&client, "ferris", "bogus", &address).await;
-        assert_eq!(
-            *res.url(),
-            url("/login", &address),
-            "Expected redirect to /login after failed login"
-        );
-        assert_eq!(res.status(), StatusCode::OK);
-        // assert!(
-        //     cookie_jar.cookies(&url("/"), &a).is_some(),
-        //     "Expected cookies (i.e. for flash messages)"
-        // );
-
-        let res = login(&client, "ferris", "hunter42", &address).await;
-        assert_eq!(
-            *res.url(),
-            url("/", &address),
-            "Expected redirect to / after successful login"
-        );
-        assert_eq!(res.status(), StatusCode::OK);
-
-        let cookies = cookie_jar
-            .cookies(&url("/", &address))
-            .expect("A cookie should be set");
-        assert!(
-            cookies.to_str().unwrap_or("").contains("id="),
-            "Expected 'id' cookie to be set after successful login"
-        );
-
-        let res = client.get(url("/logout", &address)).send().await.unwrap();
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(
-            cookie_jar.cookies(&url("/", &address)).iter().len(),
-            0,
-            "Expected 'id' cookie to be removed"
-        );
-    }
-
-    #[tokio::test]
-    async fn logout_is_idempotent() {
-        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
-
-        let cookie_jar = Arc::new(Jar::default());
-        let client = Client::builder()
-            .cookie_provider(cookie_jar.clone())
-            .build()
-            .unwrap();
-        login(&client, "ferris", "hunter42", &address).await;
-
-        // Logout twice
-        let res1 = client.get(url("/logout", &address)).send().await.unwrap();
-        let res2 = client.get(url("/logout", &address)).send().await.unwrap();
-
-        // Both should succeed without errors
-        assert_eq!(res1.status(), StatusCode::OK);
-        assert_eq!(res2.status(), StatusCode::OK);
-    }
-
-    // #[tokio::test]
-    // async fn expires_inactive_sessions() {
-    //     let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
-    //
-    //     let cookie_jar = Arc::new(Jar::default());
-    //     let client = Client::builder()
-    //         .cookie_provider(cookie_jar.clone())
-    //         .build()
-    //         .unwrap();
-    //
-    //     let _ = login(&client, "ferris", "hunter42", &address).await;
-    //
-    //     let id = cookie_jar
-    //         .cookies(&url("/", &address))
-    //         .expect("A cookie should be set")
-    //         .to_str()
-    //         .expect("Cookie should be valid")
-    //         .split_terminator("=")
-    //         .last()
-    //         .expect("Expected 'id' cookie to be set")
-    //         .to_string();
-    //
-    //     sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
-    //         .bind(Utc::now().timestamp() - 1)
-    //         .bind(&id)
-    //         .execute(&db_pool)
-    //         .await
-    //         .unwrap();
-    //
-    //     let res = client
-    //         .get(url("/protected", &address))
-    //         .send()
-    //         .await
-    //         .unwrap();
-    //
-    //     assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
-    // }
-    //
-    fn url(path: &str, base_address: &str) -> Url {
-        let formatted_url = if path.starts_with('/') {
-            format!("{base_address}{path}")
-        } else {
-            format!("{base_address}/{path}")
-        };
-        formatted_url.parse().unwrap()
-    }
-
-    async fn login(
-        client: &Client,
-        username: &str,
-        password: &str,
-        base_address: &str,
-    ) -> reqwest::Response {
-        let mut form = HashMap::new();
-        form.insert("username", username);
-        form.insert("password", password);
-        client
-            .post(url("/login", base_address))
-            .form(&form)
-            .send()
-            .await
-            .unwrap()
-    }
 }

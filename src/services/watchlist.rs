@@ -29,9 +29,9 @@ impl WatchlistService {
     }
 
     pub async fn remove_from_watchlist(
-        pool: &Pool<Sqlite>,
         user_id: i64,
         movie_id: i64,
+        pool: &Pool<Sqlite>,
     ) -> Result<(), Error> {
         WatchlistRepository::delete(pool, user_id, movie_id)
             .await
@@ -40,30 +40,10 @@ impl WatchlistService {
         Ok(())
     }
 
-    pub async fn delete_watchlisted_movie(
-        movie_id: i64,
-        user_id: i64,
-        pool: Pool<Sqlite>,
-    ) -> Result<(), Error> {
-        let _ = sqlx::query!(
-            "DELETE FROM watchlist WHERE user_id = ? AND movie_id = ?",
-            user_id,
-            movie_id
-        )
-        .execute(&pool)
-        .await?;
-        tracing::info!(
-            "Deleted movie with ID {} from user {}'s watchlist",
-            movie_id,
-            user_id
-        );
-        Ok(())
-    }
-
     pub async fn add_watchlsited_movie(
         user_id: i64,
         movie_id: i64,
-        pool: Pool<Sqlite>,
+        pool: &Pool<Sqlite>,
     ) -> Result<(), Error> {
         let result = WatchlistRepository::add(&pool, user_id, movie_id).await;
         match result {

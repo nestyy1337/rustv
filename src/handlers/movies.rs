@@ -1,7 +1,8 @@
 use askama::Template;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Arc;
+use sqlx::pool;
+use std::{os::linux::raw::stat, sync::Arc};
 
 use axum::{
     body::Body,
@@ -167,7 +168,7 @@ pub async fn delete_watchlisted_movie(
         user_id,
         movie_id
     );
-    WatchlistService::delete_watchlisted_movie(movie_id, user_id, state.pool.clone()).await
+    WatchlistService::remove_from_watchlist(user_id, movie_id, &state.pool.clone()).await
 }
 
 pub async fn get_profile_ratings(
@@ -501,7 +502,7 @@ pub async fn request_movie(
 
     let id = MovieService::add_movie(&tmdb_movie, &state.pool.clone()).await?;
 
-    WatchlistService::add_watchlsited_movie(user_id, id, state.pool.clone()).await?;
+    WatchlistService::add_watchlsited_movie(user_id, id, &state.pool.clone()).await?;
 
     Ok(Json(
         serde_json::json!({"status": "success", "movie_id": id}),
@@ -524,8 +525,7 @@ pub async fn delete_requested_movie(
         .ok_or(Error::Status(StatusCode::UNAUTHORIZED))?;
     drop(session_guard);
 
-    WatchlistService::delete_watchlisted_movie(payload.movie_id, user_id, state.pool.clone())
-        .await?;
+    WatchlistService::remove_from_watchlist(user_id, payload.movie_id, &state.pool.clone()).await?;
 
     if WatchlistRepository::is_watchlisted_anywhere(&state.pool.clone(), payload.movie_id).await? {
         tracing::info!(

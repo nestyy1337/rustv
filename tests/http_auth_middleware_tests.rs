@@ -1,0 +1,244 @@
+mod common;
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Arc};
+
+    use backend::shared::test_utils::setup_test_app;
+    use reqwest::{
+        cookie::{CookieStore, Jar},
+        Client, StatusCode, Url,
+    };
+
+    #[tokio::test]
+    async fn test1() {
+        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        let res = client.get(url("/", &address)).send().await.unwrap();
+        assert_eq!(
+            *res.url(),
+            url("/login?next=%2F", &address),
+            "Expected redirect to /login after accessing root without authentication"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = login(&client, "ferris", "bogus", &address).await;
+        assert_eq!(
+            *res.url(),
+            url("/login", &address),
+            "Expected redirect to /login after failed login"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+        // assert!(
+        //     cookie_jar.cookies(&url("/"), &a).is_some(),
+        //     "Expected cookies (i.e. for flash messages)"
+        // );
+
+        let res = login(&client, "ferris", "hunter42", &address).await;
+        assert_eq!(
+            *res.url(),
+            url("/", &address),
+            "Expected redirect to / after successful login"
+        );
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let cookies = cookie_jar
+            .cookies(&url("/", &address))
+            .expect("A cookie should be set");
+        assert!(
+            cookies.to_str().unwrap_or("").contains("id="),
+            "Expected 'id' cookie to be set after successful login"
+        );
+
+        let res = client.get(url("/logout", &address)).send().await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            cookie_jar.cookies(&url("/", &address)).iter().len(),
+            0,
+            "Expected 'id' cookie to be removed"
+        );
+    }
+
+    #[tokio::test]
+    async fn logout_is_idempotent() {
+        let (address, _) = setup_test_app().await.expect("Failed to set up test app");
+
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+        login(&client, "ferris", "hunter42", &address).await;
+
+        // Logout twice
+        let res1 = client.get(url("/logout", &address)).send().await.unwrap();
+        let res2 = client.get(url("/logout", &address)).send().await.unwrap();
+
+        // Both should succeed without errors
+        assert_eq!(res1.status(), StatusCode::OK);
+        assert_eq!(res2.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn authenticated_user_can_access_protected_routes() {
+        let (addr, _) = setup_test_app().await.unwrap();
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+        login(&client, "ferris", "hunter42", &addr).await;
+        let result = client.get(url("/protected", &addr)).send().await;
+        assert!(result.is_ok());
+        let unwraped_result = result.unwrap();
+        assert_eq!(unwraped_result.status(), StatusCode::OK);
+        assert_ne!(*unwraped_result.url(), url("/login", &addr));
+    }
+
+    #[tokio::test]
+    async fn session_persists_through_requests() {
+        let (addr, _) = setup_test_app().await.unwrap();
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+        login(&client, "ferris", "hunter42", &addr).await;
+        let result = client.get(url("/protected", &addr)).send().await;
+        assert!(result.is_ok());
+        let unwraped_result = result.unwrap();
+        assert_eq!(unwraped_result.status(), StatusCode::OK);
+        assert_ne!(*unwraped_result.url(), url("/login", &addr));
+
+        let result2 = client.get(url("/protected", &addr)).send().await;
+        assert!(result2.is_ok());
+        let unwraped_result = result2.unwrap();
+        assert_eq!(unwraped_result.status(), StatusCode::OK);
+        assert_ne!(*unwraped_result.url(), url("/login", &addr));
+    }
+
+    #[tokio::test]
+    async fn invalid_session_fails_auth() {
+        let (addr, _) = setup_test_app().await.unwrap();
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        cookie_jar.add_cookie_str("id=invalid_cookie", &url("/", &addr));
+
+        let result = client.get(url("/protected", &addr)).send().await.unwrap();
+        assert_eq!(result.url().path(), "/login");
+    }
+    #[tokio::test]
+    async fn concurrent_requests_with_same_session_work() {
+        let (address, _) = setup_test_app().await.unwrap();
+        let cookie_jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        login(&client, "ferris", "hunter42", &address).await;
+
+        let mut handles = vec![];
+        for _ in 0..5 {
+            let client = client.clone();
+            let addr = address.clone();
+            handles.push(tokio::spawn(async move {
+                client.get(url("/protected", &addr)).send().await
+            }));
+        }
+
+        for handle in handles {
+            let res = handle.await.unwrap().unwrap();
+            assert_eq!(res.status(), StatusCode::OK);
+        }
+    }
+
+    // #[tokio::test]
+    // async fn expires_inactive_sessions() {
+    //     let (address, db_pool) = setup_test_app().await.expect("Failed to set up test app");
+    //
+    //     let cookie_jar = Arc::new(Jar::default());
+    //     let client = Client::builder()
+    //         .cookie_provider(cookie_jar.clone())
+    //         .build()
+    //         .unwrap();
+    //
+    //     let _ = login(&client, "ferris", "hunter42", &address).await;
+    //
+    //     let id = cookie_jar
+    //         .cookies(&url("/", &address))
+    //         .expect("A cookie should be set")
+    //         .to_str()
+    //         .expect("Cookie should be valid")
+    //         .split_terminator("=")
+    //         .last()
+    //         .expect("Expected 'id' cookie to be set")
+    //         .to_string();
+    //
+    //     sqlx::query("UPDATE tower_sessions SET expiry_date = ? WHERE id = ?")
+    //         .bind(Utc::now().timestamp() - 1)
+    //         .bind(&id)
+    //         .execute(&db_pool)
+    //         .await
+    //         .unwrap();
+    //
+    //     let res = client
+    //         .get(url("/protected", &address))
+    //         .send()
+    //         .await
+    //         .unwrap();
+    //
+    //     assert_eq!(*res.url(), url("/login?next=%2Fprotected", &address));
+    // }
+    //
+    fn url(path: &str, base_address: &str) -> Url {
+        let formatted_url = if path.starts_with('/') {
+            format!("{base_address}{path}")
+        } else {
+            format!("{base_address}/{path}")
+        };
+        formatted_url.parse().unwrap()
+    }
+
+    async fn login(
+        client: &Client,
+        username: &str,
+        password: &str,
+        base_address: &str,
+    ) -> reqwest::Response {
+        let mut form = HashMap::new();
+        form.insert("username", username);
+        form.insert("password", password);
+        client
+            .post(url("/login", base_address))
+            .form(&form)
+            .send()
+            .await
+            .unwrap()
+    }
+
+    fn extract_session_id(cookie_jar: &Arc<Jar>, address: &str) -> String {
+        cookie_jar
+            .cookies(&url("/", address))
+            .expect("Cookie should exist")
+            .to_str()
+            .expect("Cookie should be valid")
+            .split('=')
+            .nth(1)
+            .expect("Should have value")
+            .split(';')
+            .next()
+            .expect("Should have ID")
+            .to_string()
+    }
+}
