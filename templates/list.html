@@ -1,0 +1,184 @@
+{% extends "_layout.html" %}
+{% block title %}Torrent Management - RustTV{% endblock %}
+{% block page_title %}Torrent Management{% endblock %}
+{% block page_description %}Manage active torrent downloads{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="glass rounded-xl p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-semibold text-dark-text-primary">Active Downloads</h2>
+            <a href="/admin/movies">
+                <a href="/steal">
+                <button class="btn-primary text-white font-medium py-2 px-4 rounded-lg hover-lift">
+                    Search for Movies
+                </button>
+                </a>
+            </a>
+        </div>
+
+        {% if !downloads.is_empty() %}
+        <div class="space-y-4">
+            {% for (torrent_id, download) in downloads %}
+            <div class="glass rounded-lg p-4 border border-dark-border">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-dark-text-primary">{{ download.movie.title }}</h3>
+                    <span class="px-3 py-1 rounded-full text-sm font-medium
+                        {% if download.is_downloading() %}bg-primary-500/20 text-primary-400
+                        {% else if download.is_completed() %}bg-accent-emerald/20 text-accent-emerald
+                        {% else %}bg-red-500/20 text-red-400{% endif %}">
+                        {{ download.status_text() }}
+                    </span>
+                        {% if download.is_downloading() %}
+                    <div class ="flex items-center gap-4">
+                        <button class="text-dark-text-muted hover:text-primary-400" btn-stop-download data-tmdb-id="{{ torrent_id.tmdb_id }}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                </svg>
+                                Stop Download
+                        </button>
+                    </div>
+                        {% endif %}
+
+                {# Progress Bar #}
+                <div class="mb-2">
+                    <div class="flex justify-between text-sm text-dark-text-muted mb-1">
+                        <span>{{ download.downloaded() }}%</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="w-16 h-16 text-dark-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            <p class="text-dark-text-muted text-lg">No active downloads</p>
+            <p class="text-dark-text-muted text-sm mt-2">Start a download by searching for a movie</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="glass rounded-xl p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-accent-purple/20">
+                    <svg class="w-5 h-5 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-dark-text-primary">Active Processing</h2>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-accent-purple/20 text-accent-purple text-sm font-medium">
+                {{ processing.len() }} converting
+            </span>
+        </div>
+
+        {% if !processing.is_empty() %}
+        <div class="space-y-4">
+            {% for (video_name, proc) in processing %}
+            <div class="glass rounded-lg p-4 border border-dark-border">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-dark-text-primary">{{ video_name }}</h3>
+                    <span class="px-3 py-1 rounded-full bg-accent-purple/20 text-accent-purple text-sm font-medium">
+                        Converting
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="flex items-center gap-3 p-3 rounded-lg bg-dark-hover/50">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary-500/20">
+                            <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-dark-text-muted">Elapsed Time</p>
+                            <p class="text-sm font-medium text-dark-text-primary">{{ proc.status.elapsed }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 p-3 rounded-lg bg-dark-hover/50">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-accent-emerald/20">
+                            <svg class="w-4 h-4 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-dark-text-muted">Speed</p>
+                            <p class="text-sm font-medium text-dark-text-primary">{{ proc.status.speed }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 p-3 rounded-lg bg-dark-hover/50">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-accent-rose/20">
+                            <svg class="w-4 h-4 text-accent-rose" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-dark-text-muted">Progress</p>
+                            <p class="text-sm font-medium text-dark-text-primary">Frame {{ proc.status.progress }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="w-16 h-16 text-dark-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <p class="text-dark-text-muted text-lg">No movies being processed</p>
+            <p class="text-dark-text-muted text-sm mt-2">Movies will appear here when they're being converted</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+setInterval(async () => {
+    try {
+        const response = await apiFetch('/api/torrents/status');
+        if (response.ok) {
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('Failed to fetch status:', error);
+    }
+}, 600000);
+
+document.addEventListener('click', async (event) => {
+    if (event.target.closest('[btn-stop-download]')) {
+        const button = event.target.closest('[btn-stop-download]');
+        const tmdbId = button.getAttribute('data-tmdb-id');
+
+        if (!confirm('Are you sure you want to stop this download?')) {
+            return;
+        }
+
+        try {
+            const response = await apiFetch('/api/movie/download/stop', {
+                method: 'POST',
+                body: JSON.stringify({ tmdb_id: torrent_id.tmdbId }),
+            });
+
+            if (response.ok) {
+                alert('Download stopped successfully.');
+                window.location.reload();
+            } else {
+                const errorData = await response.json();
+                alert('Error stopping download: ' + errorData.message);
+            }
+        } catch (error) {
+            console.error('Error stopping download:', error);
+            alert('An unexpected error occurred.');
+        }
+    }
+});
+
+</script>
+{% endblock %}

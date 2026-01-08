@@ -1,0 +1,112 @@
+{% extends "_layout.html" %}
+{% block title %} {{ profile.display_name }} - Profile {% endblock %}
+{% block page_title %} {{ profile.display_name }} {% endblock %}
+{% block page_description %} @{{ profile.username }} {% endblock %}
+{%- block content -%}
+
+<div class="glass rounded-xl p-6 shadow-2xl mb-6">
+    <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <div class="flex-shrink-0">
+            <div class="h-24 w-24 rounded-full bg-gradient-to-r from-primary-400 to-accent-purple flex items-center justify-center shadow-lg">
+                <span class="text-white font-bold text-2xl">{{ profile.initials() }}</span>
+            </div>
+        </div>
+
+        <div class="flex-grow">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-dark-text-primary mb-1">{{ profile.display_name }}</h1>
+                    <p class="text-dark-text-secondary">@{{ profile.username }}</p>
+                </div>
+
+                <div class="flex gap-3">
+                    <a href="/profile/{{ profile.username }}/edit" class="btn-primary text-white font-medium py-2 px-4 rounded-lg hover-lift">
+                        Edit Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="glass rounded-xl p-6 shadow-2xl hover-lift">
+        <div class="flex items-center justify-between mb-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-cyan/20">
+                <svg class="w-6 h-6 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                </svg>
+            </div>
+            <span class="text-2xl font-bold text-dark-text-primary">{{ profile.watchlist_count }}</span>
+        </div>
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-1">Watchlist</h3>
+        <p class="text-dark-text-secondary text-sm">Shows to watch</p>
+        <div class="mt-4">
+            <a href="/watchlist/{{ profile.username }}" class="text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+                View Watchlist →
+            </a>
+        </div>
+    </div>
+
+    <div class="glass rounded-xl p-6 shadow-2xl hover-lift">
+        <div class="flex items-center justify-between mb-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-emerald/20">
+                <svg class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <span class="text-2xl font-bold text-dark-text-primary">{{ profile.watched_count }}</span>
+        </div>
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-1">Watched</h3>
+        <p class="text-dark-text-secondary text-sm">Completed shows</p>
+        <div class="mt-4">
+            <a href="/watched/{{ profile.username }}" class="text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+                View History →
+            </a>
+        </div>
+    </div>
+
+    <div class="glass rounded-xl p-6 shadow-2xl hover-lift">
+        <div class="flex items-center justify-between mb-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-rose/20">
+                <svg class="w-6 h-6 text-accent-rose" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                </svg>
+            </div>
+            <span class="text-2xl font-bold text-dark-text-primary">{{ profile.reviews_count }}</span>
+        </div>
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-1">Reviews</h3>
+        <p class="text-dark-text-secondary text-sm">Shows reviewed</p>
+        <div class="mt-4">
+            <a href="/reviews/{{ profile.username }}" class="text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+                View Reviews →
+            </a>
+        </div>
+    </div>
+</div>
+
+
+<div class="glass rounded-xl p-6 shadow-2xl">
+    <h2 class="text-xl font-semibold text-dark-text-primary mb-4">Quick Actions</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <a href="/search" class="flex items-center gap-3 p-4 bg-dark-hover rounded-lg hover:bg-dark-border transition-colors group">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary-500/20 group-hover:bg-primary-500/30 transition-colors">
+                <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <span class="text-dark-text-primary font-medium">Find Shows</span>
+        </a>
+
+        <a href="/settings" class="flex items-center gap-3 p-4 bg-dark-hover rounded-lg hover:bg-dark-border transition-colors group">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-dark-text-muted/20 group-hover:bg-dark-text-muted/30 transition-colors">
+                <svg class="w-5 h-5 text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </div>
+            <span class="text-dark-text-primary font-medium">Settings</span>
+        </a>
+    </div>
+</div>
+{%- endblock -%}

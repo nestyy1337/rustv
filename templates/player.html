@@ -1,0 +1,103 @@
+{% extends "_layout.html" %}
+{% block title %} RustTV - {{ movie.title }} {% endblock %}
+{% block page_title %} {{ movie.title }} {% endblock %}
+{% block page_description %}{% endblock %}
+{%- block content -%}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="/static/js/player-controls.js"></script>
+
+<div class="relative w-full max-w-5xl bg-black overflow-hidden group" id="video-container">
+    <video id="video" class="w-full block"></video>
+
+    <div class="absolute inset-0 flex items-center justify-center bg-black/30
+                transition-opacity duration-300
+                group-[.playing]:opacity-0 group-[.playing]:pointer-events-none"
+         id="video-overlay">
+        <div class="w-20 h-20 bg-black/60 rounded-full flex items-center justify-center
+                    cursor-pointer transition-all hover:scale-110 hover:bg-black/80"
+             id="play-large-btn">
+            <svg class="w-10 h-10 fill-white ml-1" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+        </div>
+    </div>
+
+    <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent
+                px-4 pb-4 pt-10 transition-opacity duration-300
+                opacity-0 group-hover:opacity-100 group-[&:not(.playing)]:opacity-100"
+         id="controls">
+
+        <div class="w-full py-2 cursor-pointer group/progress" id="progress-container">
+            <div class="relative w-full h-1 bg-white/30 rounded" id="progress-bar">
+                <div class="h-full bg-red-600 rounded w-0" id="progress-filled"></div>
+                <div class="absolute top-1/2 left-0 w-4 h-4 bg-red-600 rounded-full
+                            -translate-x-1/2 -translate-y-1/2
+                            scale-0 group-hover/progress:scale-100 transition-transform"
+                     id="progress-handle"></div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-2">
+            <div class="flex items-center gap-4">
+                <button class="bg-transparent border-none p-1 cursor-pointer flex items-center"
+                        id="play-pause-btn">
+                    <svg class="w-7 h-7 fill-white icon-play group-[.playing]:hidden" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <svg class="w-7 h-7 fill-white icon-pause hidden group-[.playing]:block" viewBox="0 0 24 24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                </button>
+
+                <span class="text-white text-sm font-mono">
+                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
+                </span>
+
+            <div class="flex items-center gap-2" id="volume-container">
+                <button class="p-1" id="mute-btn">
+                    <svg class="w-6 h-6 fill-white hidden" id="icon-muted" viewBox="0 0 24 24">
+                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                    </svg>
+                    <svg class="w-6 h-6 fill-white hidden" id="icon-vol-med" viewBox="0 0 24 24">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                    </svg>
+                </button>
+                <input type="range"
+                       min="0"
+                       max="1"
+                       step="0.05"
+                       value="1"
+                       id="volume-controls"
+                       class="w-20 cursor-pointer accent-red-600">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label for="speed-controls" class="text-white text-sm">Speed</label>
+                <select id="speed-controls"
+                        onchange="controlPlaybackSpeed(parseFloat(this.value))"
+                        class="bg-white/20 text-white border border-white/30 rounded px-2 py-1
+                               text-sm cursor-pointer hover:bg-white/30 transition-colors">
+                    <option value="1" selected class="bg-neutral-800">1x</option>
+                    <option value="1.25" class="bg-neutral-800">1.25x</option>
+                    <option value="1.5" class="bg-neutral-800">1.5x</option>
+                    <option value="1.75" class="bg-neutral-800">1.75x</option>
+                    <option value="2" class="bg-neutral-800">2x</option>
+                </select>
+            </div>
+
+                </div>
+                <div>
+                    <button type="button" onclick="toggleFullScreen()" class="p-1 cursor-pointer">
+                        <svg class="w-6 h-6 fill-white" viewBox="0 0 24 24">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                        </svg>
+                    </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    setupMovie({{ movie.id }},{{ timestamp }});
+</script>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "_layout.html" %}
+{% block title %}Admin Console - RustTV{% endblock %}
+{% block page_title %}Admin Console{% endblock %}
+        <!-- User Management (Placeholder) -->
+{% block page_description %}System administration and management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Welcome Section -->
+    <div class="glass rounded-xl p-8 shadow-2xl">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20">
+                <svg class="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-3xl font-bold text-dark-text-primary">Admin Console</h1>
+                <p class="text-dark-text-secondary">Manage your RustTV instance</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Sections Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Torrent Management -->
+        <a href="/admin/torrents" class="block group">
+            <div class="glass rounded-xl p-6 shadow-2xl hover-lift h-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-purple/20 group-hover:bg-accent-purple/30 transition-colors">
+                        <svg class="w-6 h-6 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                    </div>
+                    <svg class="w-5 h-5 text-dark-text-muted group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-dark-text-primary mb-2 group-hover:text-primary-400 transition-colors">
+                    Torrent Management
+                </h3>
+                <p class="text-dark-text-secondary text-sm">
+                    Monitor active downloads and video processing status
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-xs text-dark-text-muted">
+                    <span class="px-2 py-1 rounded bg-accent-purple/10 text-accent-purple">Downloads</span>
+                    <span class="px-2 py-1 rounded bg-accent-purple/10 text-accent-purple">Processing</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Movie Requests -->
+        <a href="/requested" class="block group">
+            <div class="glass rounded-xl p-6 shadow-2xl hover-lift h-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-emerald/20 group-hover:bg-accent-emerald/30 transition-colors">
+                        <svg class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                        </svg>
+                    </div>
+                    <svg class="w-5 h-5 text-dark-text-muted group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-dark-text-primary mb-2 group-hover:text-primary-400 transition-colors">
+                    Movie Requests
+                </h3>
+                <p class="text-dark-text-secondary text-sm">
+                    View and manage user movie requests
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-xs text-dark-text-muted">
+                    <span class="px-2 py-1 rounded bg-accent-emerald/10 text-accent-emerald">Pending</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- System Metrics -->
+        <a href="/metrics" class="block group">
+            <div class="glass rounded-xl p-6 shadow-2xl hover-lift h-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-rose/20 group-hover:bg-accent-rose/30 transition-colors">
+                        <svg class="w-6 h-6 text-accent-rose" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <svg class="w-5 h-5 text-dark-text-muted group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-dark-text-primary mb-2 group-hover:text-primary-400 transition-colors">
+                    System Metrics
+                </h3>
+                <p class="text-dark-text-secondary text-sm">
+                    View system performance and statistics
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-xs text-dark-text-muted">
+                    <span class="px-2 py-1 rounded bg-accent-rose/10 text-accent-rose">Analytics</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Movie Search -->
+        <a href="/steal" class="block group">
+            <div class="glass rounded-xl p-6 shadow-2xl hover-lift h-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-500/20 group-hover:bg-primary-500/30 transition-colors">
+                        <svg class="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <svg class="w-5 h-5 text-dark-text-muted group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-dark-text-primary mb-2 group-hover:text-primary-400 transition-colors">
+                    Search Movies
+                </h3>
+                <p class="text-dark-text-secondary text-sm">
+                    Search and add new movies to the library
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-xs text-dark-text-muted">
+                    <span class="px-2 py-1 rounded bg-primary-500/10 text-primary-400">TMDB</span>
+                    <span class="px-2 py-1 rounded bg-primary-500/10 text-primary-400">IMDb</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Available Movies -->
+        <a href="/" class="block group">
+            <div class="glass rounded-xl p-6 shadow-2xl hover-lift h-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-amber/20 group-hover:bg-accent-amber/30 transition-colors">
+                        <svg class="w-6 h-6 text-accent-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
+                        </svg>
+                    </div>
+                    <svg class="w-5 h-5 text-dark-text-muted group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-dark-text-primary mb-2 group-hover:text-primary-400 transition-colors">
+                    Movie Library
+                </h3>
+                <p class="text-dark-text-secondary text-sm">
+                    Browse all available movies in the library
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-xs text-dark-text-muted">
+                    <span class="px-2 py-1 rounded bg-accent-amber/10 text-accent-amber">Catalog</span>
+                </div>
+            </div>
+        </a>
+
+        <div class="glass rounded-xl p-6 shadow-2xl h-full opacity-50">
+            <div class="flex items-start justify-between mb-4">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-dark-text-muted/20">
+                    <svg class="w-6 h-6 text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 rounded bg-dark-text-muted/10 text-dark-text-muted text-xs">Coming Soon</span>
+            </div>
+            <h3 class="text-xl font-semibold text-dark-text-muted mb-2">
+                User Management
+            </h3>
+            <p class="text-dark-text-muted text-sm">
+                Manage users and permissions
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

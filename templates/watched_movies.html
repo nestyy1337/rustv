@@ -1,0 +1,316 @@
+{% extends "_layout.html" %}
+{% block title %} {{ profile.display_name }} - Watched Movies {% endblock %}
+{% block page_title %} Watched Movies {% endblock %}
+{% block page_description %} @{{ profile.username }}'s viewing history {% endblock %}
+{%- block content -%}
+
+<div class="mb-6">
+    <a href="/profile/{{ profile.username }}" class="inline-flex items-center text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        Back to Profile
+    </a>
+</div>
+
+<div class="glass rounded-xl p-6 shadow-2xl mb-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-emerald/20">
+                <svg class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-dark-text-primary">Watched Movies</h1>
+                <p class="text-dark-text-secondary">{{ movies.len() }} movies completed</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <select class="bg-dark-surface border border-dark-border text-dark-text-primary rounded-lg px-3 py-2 text-sm focus-glow">
+                <option value="recent">Recently Watched</option>
+                <option value="rating">Highest Rated</option>
+                <option value="title">Alphabetical</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+{% if movies.len() > 0 %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for movie in movies %}
+    <div class="glass rounded-xl p-6 shadow-2xl hover-lift" data-movie-id="{{ movie.movie_id }}" data-watched-at="{{ movie.watched_at }}">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex-grow">
+                <a href="/movies/{{ movie.movie_id }}" class="text-lg font-semibold text-dark-text-primary mb-1">
+                    {{ movie.title }}
+                </a>
+                <p class="text-dark-text-secondary text-sm">
+                    {{ movie.year }} &middot; {{ movie.genre }}
+                </p>
+            </div>
+
+            {% if movie.rating.is_some() %}
+            <div class="flex items-center gap-1 ml-4">
+                <svg class="w-4 h-4 text-accent-rose" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                <span class="text-dark-text-primary font-medium">{{ movie.rating.unwrap() }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center gap-2 text-dark-text-muted text-sm mb-4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <span>Watched {{ movie.format_date() }}</span>
+        </div>
+
+        <div class="flex gap-2">
+            <a href={{ movie.imdb_url() }} target="_blank" rel="noopener noreferrer">
+            <button class="btn-primary text-white text-xs font-medium py-1.5 px-3 rounded-lg hover-lift">
+                View Details
+            </button>
+            </a>
+            <button class="btn-delete-history bg-dark-hover text-dark-text-primary text-xs font-medium py-1.5 px-3 rounded-lg hover:bg-dark-border transition-colors">
+                Delete from history
+            </button>
+            {% if movie.rating.is_none() %}
+            <button class="btn-add-rating bg-dark-hover text-dark-text-primary text-xs font-medium py-1.5 px-3 rounded-lg hover:bg-dark-border transition-colors" data-movie-id="{{ movie.movie_id }}" data-movie-title="{{ movie.title }}">
+                Add Rating
+            </button>
+            {% else %}
+            <button class="btn-edit-rating bg-dark-hover text-dark-text-primary text-xs font-medium py-1.5 px-3 rounded-lg hover:bg-dark-border transition-colors" data-movie-id="{{ movie.movie_id }}" data-movie-title="{{ movie.title }}" data-current-rating="{{ movie.rating.unwrap() }}">
+                Edit Rating
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="flex justify-center mt-8">
+    <div class="flex items-center gap-2">
+        <button class="p-2 rounded-lg bg-dark-hover hover:bg-dark-border text-dark-text-secondary hover:text-dark-text-primary transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+        <span class="px-3 py-1 text-sm text-dark-text-primary">Page 1 of 3</span>
+        <button class="p-2 rounded-lg bg-dark-hover hover:bg-dark-border text-dark-text-secondary hover:text-dark-text-primary transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+{% else %}
+<div class="glass rounded-xl p-12 shadow-2xl text-center">
+    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-dark-text-muted/20 mb-4">
+        <svg class="w-8 h-8 text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+        </svg>
+    </div>
+    <h3 class="text-xl font-semibold text-dark-text-primary mb-2">No Movies Watched Yet</h3>
+    <p class="text-dark-text-secondary mb-6">Start building your viewing history by watching some movies!</p>
+    <a href="/" class="btn-primary text-white font-medium py-2 px-6 rounded-lg hover-lift">
+        Find Movies to Watch
+    </a>
+</div>
+{% endif %}
+
+<div id="ratingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="glass rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+        <h3 class="text-2xl font-bold text-dark-text-primary mb-4">Rate Movie</h3>
+        <p id="modalMovieTitle" class="text-dark-text-secondary mb-6"></p>
+
+        <div class="mb-6">
+            <label for="ratingInput" class="block text-dark-text-primary mb-2 font-medium">Rating (0-10)</label>
+            <input
+                type="number"
+                id="ratingInput"
+                min="0"
+                max="10"
+                step="0.1"
+                class="w-full bg-dark-surface border border-dark-border text-dark-text-primary rounded-lg px-4 py-3 focus-glow"
+                placeholder="Enter rating (e.g., 8.5)"
+            >
+        </div>
+
+        <div class="flex gap-3">
+            <button id="submitRating" class="btn-primary text-white font-medium py-2 px-6 rounded-lg hover-lift flex-1">
+                Save Rating
+            </button>
+            <button id="cancelRating" class="bg-dark-hover text-dark-text-primary font-medium py-2 px-6 rounded-lg hover:bg-dark-border transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+{%- endblock -%}
+
+
+{% block extra_js %}
+<script>
+    document.querySelector('select').addEventListener('change', function() {
+        const sortBy = this.value;
+        const sortHandlers = {
+            'recent': () => sortByRecent(),
+            'rating': () => sortByRating(),
+            'title': () => sortByTitle()
+        };
+        sortHandlers[sortBy]?.();
+    });
+
+function sortByRecent() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort(calcTimeDiff);
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function sortByRating() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort((a, b) => {
+        const ratingA = parseFloat(a.querySelector('.text-accent-rose')?.nextElementSibling?.textContent) || 0;
+        const ratingB = parseFloat(b.querySelector('.text-accent-rose')?.nextElementSibling?.textContent) || 0;
+        return ratingB - ratingA;
+    });
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function sortByTitle() {
+    const container = document.querySelector('.grid');
+    const movies = Array.from(container.children);
+    movies.sort((a, b) => {
+        const titleA = a.querySelector('h3').textContent.toLowerCase();
+        const titleB = b.querySelector('h3').textContent.toLowerCase();
+        return titleA.localeCompare(titleB);
+    });
+    container.innerHTML = '';
+    movies.forEach(movie => container.appendChild(movie));
+}
+
+function calcTimeDiff(a, b) {
+    return new Date(a.dataset.watchedAt) - new Date(b.dataset.watchedAt);
+}
+
+
+document.querySelectorAll('.btn-delete-history').forEach(button => {
+    button.addEventListener('click', async function() {
+        const movieCard = this.closest('.glass');
+        const movieTitle = movieCard.querySelector('h3').textContent;
+        const movieId = movieCard.dataset.movieId;
+        console.log(`Attempting to delete movie ID: ${movieId}`);
+        console.log(`MovieCard: `, movieCard);
+        if (!confirm(`Are you sure you want to remove "${movieTitle}" from your watched history?`)) {
+            return;
+        }
+
+        try {
+            const response = await apiFetch(`/watched/{{ profile.username }}/${movieCard.dataset.movieId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete movie from history');
+            }
+
+            movieCard.remove();
+
+            alert(`"${movieTitle}" has been removed from your watched history.`);
+        } catch (error) {
+            console.error('Error deleting movie from history:', error);
+            alert('An error occurred while trying to remove the movie. Please try again.');
+        }
+    });
+});
+
+const modal = document.getElementById('ratingModal');
+const ratingInput = document.getElementById('ratingInput');
+const modalMovieTitle = document.getElementById('modalMovieTitle');
+const submitRating = document.getElementById('submitRating');
+const cancelRating = document.getElementById('cancelRating');
+let currentMovieId = null;
+
+function openRatingModal(movieId, movieTitle, currentRating = null) {
+    currentMovieId = movieId;
+    modalMovieTitle.textContent = movieTitle;
+    ratingInput.value = currentRating || '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    ratingInput.focus();
+}
+
+function closeRatingModal() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    currentMovieId = null;
+    ratingInput.value = '';
+}
+
+cancelRating.addEventListener('click', closeRatingModal);
+
+modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+        closeRatingModal();
+    }
+});
+
+submitRating.addEventListener('click', async function() {
+    const rating = parseFloat(ratingInput.value);
+
+    if (isNaN(rating) || rating < 0 || rating > 10) {
+        alert('Please enter a valid rating between 0 and 10');
+        return;
+    }
+
+    try {
+        const response = await apiFetch(`/api/watched/{{ profile.username }}/${currentMovieId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ rating: rating }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update rating');
+        }
+
+        closeRatingModal();
+        location.reload();
+    } catch (error) {
+        console.error('Error updating rating:', error);
+        alert('An error occurred while updating the rating. Please try again.');
+    }
+});
+
+document.querySelectorAll('.btn-add-rating').forEach(button => {
+    button.addEventListener('click', function() {
+        const movieId = this.dataset.movieId;
+        const movieTitle = this.dataset.movieTitle;
+        openRatingModal(movieId, movieTitle);
+    });
+});
+
+document.querySelectorAll('.btn-edit-rating').forEach(button => {
+    button.addEventListener('click', function() {
+        const movieId = this.dataset.movieId;
+        const movieTitle = this.dataset.movieTitle;
+        const currentRating = this.dataset.currentRating;
+        openRatingModal(movieId, movieTitle, currentRating);
+    });
+});
+
+</script>
+{% endblock %}
+
+

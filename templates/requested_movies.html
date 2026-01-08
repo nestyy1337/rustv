@@ -1,0 +1,189 @@
+{% extends "_layout.html" %}
+{% block title %}Requested Movies{% endblock %}
+{% block page_title %}Requested Movies{% endblock %}
+{% block page_description %}Movies waiting to be added to the collection{% endblock %}
+
+{%- block content -%}
+<div class="w-full -m-6">
+  <div class="flex flex-col lg:flex-row gap-6 p-6">
+    <div class="lg:w-[70%] w-full">
+      <div class="glass rounded-xl p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-dark-text-primary">Requested Movies</h2>
+            <p class="text-sm text-dark-text-secondary mt-1">{{ movies.len() }} movies pending</p>
+          </div>
+          <div class="search-bar relative">
+            <input
+              type="text"
+              placeholder="Search requests..."
+              class="pl-10 pr-4 py-2 rounded-lg bg-dark-surface text-dark-text-primary placeholder-dark-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-400 w-64"
+            />
+            <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-dark-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+
+        {% if movies.is_empty() %}
+        <div class="text-center py-12">
+          <p class="text-dark-text-secondary text-lg">No requested movies yet</p>
+          <p class="text-dark-text-muted text-sm mt-2">Be the first to request a movie!</p>
+        </div>
+        {% else %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" data-movie-grid>
+          {% for movie in movies %}
+          <div
+             class="block"
+             data-movie-card
+             data-movie-genre="{{ movie.genre.to_lowercase() }}"
+             data-movie-year="{{ movie.release_year }}"
+             data-movie-title="{{ movie.title.to_lowercase() }}">
+            <div class="bg-dark-surface rounded-lg overflow-hidden hover-lift cursor-pointer relative">
+            <a href="/movies/{{ movie.id }}">
+              <div class="absolute top-3 right-3 z-10 bg-accent-orange/90 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1 rounded-full">
+                Pending
+              </div>
+
+              <div class="aspect-[2/3] bg-dark-hover overflow-hidden">
+                <img
+                  src="/api/movie/{{ movie.id }}/poster"
+                  alt="{{ movie.title }} poster"
+                  class="w-full h-full object-cover opacity-75"
+                  onerror="this.style.display='none'; this.parentElement.classList.add('flex', 'items-center', 'justify-center');"
+                />
+              </div>
+              <div class="p-4">
+                <h3 class="font-semibold text-dark-text-primary mb-1">{{ movie.title }}</h3>
+                <div class="text-sm text-dark-text-secondary">
+                  {% if movie.release_year > 0 %}{{ movie.release_year }} • {% endif %}
+                  {{ movie.genre }}
+                </div>
+                {% if movie.created_at.is_some() %}
+                <div class="text-xs text-dark-text-muted mt-2">
+                  Requested {{ movie.created_at_string() }}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="lg:w-[30%] w-full space-y-6">
+
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Request Stats</h3>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-dark-text-secondary">Total Requests</span>
+            <span class="text-2xl font-bold text-primary-400">{{ movies.len() }}</span>
+          </div>
+          <div class="pt-4 border-t border-dark-border">
+            <p class="text-xs text-dark-text-muted">
+              Movies are typically added within 24-48 hours of being requested
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Filter by Genre</h3>
+        <div class="space-y-2">
+          <button data-genre="action" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Action</span>
+          </button>
+          <button data-genre="comedy" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Comedy</span>
+          </button>
+          <button data-genre="drama" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Drama</span>
+          </button>
+          <button data-genre="scifi" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Sci-Fi</span>
+          </button>
+          <button data-genre="horror" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Horror</span>
+          </button>
+          <button data-genre="romance" class="w-full text-left px-4 py-3 rounded-lg bg-dark-surface hover:bg-dark-hover transition-colors flex items-center justify-between group">
+            <span class="text-dark-text-primary">Romance</span>
+          </button>
+        </div>
+        <button data-genre="clear" class="w-full mt-4 text-primary-400 text-sm font-medium hover:text-primary-300">Clear Filter</button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{%- endblock -%}
+
+{% block extra_js %}
+<script>
+let selectedGenre = null;
+let debounceTimer = null;
+
+document.querySelector('.search-bar input').addEventListener('input', function(e) {
+  const query = e.target.value.toLowerCase().trim();
+
+  document.querySelectorAll('[data-movie-card]').forEach(card => {
+    const title = card.dataset.movieTitle;
+    const matchesSearch = !query || title.includes(query);
+    const matchesGenre = !selectedGenre || card.dataset.movieGenre === selectedGenre;
+
+    card.style.display = (matchesSearch && matchesGenre) ? 'block' : 'none';
+  });
+});
+
+document.querySelectorAll('[data-genre]').forEach(button => {
+  button.addEventListener('click', function() {
+    const genre = button.dataset.genre.toLowerCase();
+
+    if (genre === 'clear') {
+      selectedGenre = null;
+      document.querySelectorAll('[data-genre]').forEach(btn => {
+        if (btn.dataset.genre !== 'clear') {
+          btn.classList.remove('bg-primary-600', 'text-white');
+          btn.classList.add('bg-dark-surface');
+        }
+      });
+      document.querySelectorAll('[data-movie-card]').forEach(card => {
+        const searchQuery = document.querySelector('.search-bar input').value.toLowerCase().trim();
+        const matchesSearch = !searchQuery || card.dataset.movieTitle.includes(searchQuery);
+        card.style.display = matchesSearch ? 'block' : 'none';
+      });
+      return;
+    }
+
+    if (selectedGenre === genre) {
+      selectedGenre = null;
+      button.classList.remove('bg-primary-600', 'text-white');
+      button.classList.add('bg-dark-surface');
+    } else {
+      document.querySelectorAll('[data-genre]').forEach(btn => {
+        if (btn.dataset.genre !== 'clear') {
+          btn.classList.remove('bg-primary-600', 'text-white');
+          btn.classList.add('bg-dark-surface');
+        }
+      });
+      button.classList.remove('bg-dark-surface');
+      button.classList.add('bg-primary-600', 'text-white');
+      selectedGenre = genre;
+    }
+
+    const searchQuery = document.querySelector('.search-bar input').value.toLowerCase().trim();
+    document.querySelectorAll('[data-movie-card]').forEach(card => {
+      const movieGenre = card.dataset.movieGenre;
+      const matchesSearch = !searchQuery || card.dataset.movieTitle.includes(searchQuery);
+      const matchesGenre = !selectedGenre || movieGenre === selectedGenre;
+
+      card.style.display = (matchesSearch && matchesGenre) ? 'block' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,5 @@
+-- Add migration script here
+ALTER TABLE movies
+ADD COLUMN available BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE movies ADD COLUMN requested BOOLEAN NOT NULL DEFAULT FALSE;

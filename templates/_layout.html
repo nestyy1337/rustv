@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{% block title %}RustTV{% endblock %}</title>
+        <meta http-equiv="expires" content="Sat, 01 Dec 2001 00:00:00 GMT" />
+        <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="pragma" content="no-cache" />
+        <meta name="robots" content="noindex, nofollow" />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+        <meta name="csrf-token" content="{{ csrf_token }}">
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: {
+                                50: '#eef2ff',
+                                100: '#e0e7ff',
+                                200: '#c7d2fe',
+                                300: '#a5b4fc',
+                                400: '#818cf8',
+                                500: '#6366f1',
+                                600: '#4f46e5',
+                                700: '#4338ca',
+                                800: '#3730a3',
+                                900: '#312e81',
+                            },
+                            dark: {
+                                bg: '#0f0f11',
+                                surface: '#1a1a1e',
+                                hover: '#242429',
+                                border: '#2e2e35',
+                                text: {
+                                    primary: '#f0f0f5',
+                                    secondary: '#a8a8b3',
+                                    muted: '#6e6e7a',
+                                }
+                            },
+                            accent: {
+                                purple: '#9333ea',
+                                cyan: '#06b6d4',
+                                emerald: '#10b981',
+                                rose: '#f43f5e',
+                            }
+                        },
+                        fontFamily: {
+                            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        },
+                        animation: {
+                            'gradient': 'gradient 8s ease infinite',
+                            'glow': 'glow 2s ease-in-out infinite alternate',
+                        },
+                        keyframes: {
+                            gradient: {
+                                '0%, 100%': {
+                                    'background-size': '200% 200%',
+                                    'background-position': 'left center'
+                                },
+                                '50%': {
+                                    'background-size': '200% 200%',
+                                    'background-position': 'right center'
+                                }
+                            },
+                            glow: {
+                                'from': {
+                                    'box-shadow': '0 0 10px rgba(99, 102, 241, 0.3), 0 0 20px rgba(99, 102, 241, 0.2)',
+                                },
+                                'to': {
+                                    'box-shadow': '0 0 20px rgba(99, 102, 241, 0.4), 0 0 30px rgba(99, 102, 241, 0.3)',
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        </script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: #1a1a1e;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: #4338ca;
+                border-radius: 5px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #6366f1;
+            }
+
+            {
+                transition: background-color 0.2s ease, border-color 0.2s ease;
+            }
+
+            .gradient-text {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            .animated-gradient {
+                background: linear-gradient(-45deg, #4338ca, #6366f1, #818cf8, #a5b4fc);
+                background-size: 400% 400%;
+                animation: gradient 15s ease infinite;
+            }
+
+            .glass {
+                background: rgba(26, 26, 30, 0.7);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .hover-lift {
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .hover-lift:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+            }
+
+            .focus-glow:focus {
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+            }
+
+            .btn-primary {
+                background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+                transition: all 0.3s ease;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 7px 14px rgba(99, 102, 241, 0.4);
+            }
+
+            .spinner {
+                border: 3px solid rgba(99, 102, 241, 0.1);
+                border-radius: 50%;
+                border-top: 3px solid #6366f1;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            #video-container:fullscreen {
+                max-width: none;
+                width: 100vw;
+                height: 100vh;
+            }
+
+            #video-container:fullscreen video {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
+
+             {%~ include "_layout.css" ~%}
+            {% block extra_css %}{% endblock %}
+        </style>
+    </head>
+    <body class="min-h-screen flex flex-col bg-dark-bg text-dark-text-primary">
+        <nav class="glass sticky top-0 z-50 border-b border-dark-border">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                        <a href="/">
+                            <h1 class="text-xl font-bold gradient-text">RustTV</h1>
+                        </a>
+                        </div>
+                        <div class="hidden md:block ml-10">
+                            <div class="flex items-baseline space-x-4">
+                                <a href="/" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Dashboard</a>
+                            </div>
+                        </div>
+                        <div class="hidden md:block ml-10">
+                            <div class="flex items-baseline space-x-4">
+                                <a href="/requested" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Requested Movies</a>
+                            </div>
+                        </div>
+                        <div class="hidden md:block ml-10">
+                            <div class="flex items-baseline space-x-4">
+                                <a href="/steal" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Request a Movie</a>
+                            </div>
+                        </div>
+                        <div class="hidden md:block ml-10">
+                            <div class="flex items-baseline space-x-4">
+                                <a href="/admin" class="text-dark-text-secondary hover:text-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors">Admin Console</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative profile-wrapper">
+                            <button class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-bg focus:ring-primary-500"
+                                onclick="document.getElementById('menu').classList.toggle('hidden')">
+                                <div class="h-8 w-8 rounded-full bg-gradient-to-r from-primary-400 to-accent-purple flex items-center justify-center">
+                                    <span class="text-white font-medium">U</span>
+                                </div>
+                            </button>
+                            <div id="menu" class="hidden absolute right-0 mt-2 w-48 rounded-lg glass shadow-lg py-1 z-50">
+                                <a href="/profile" class="block px-4 py-2 text-sm text-dark-text-secondary hover:bg-dark-hover hover:text-primary-400 transition-colors">View Profile</a>
+                                <!-- <a href="/settings" class="block px-4 py-2 text-sm text-dark-text-secondary hover:bg-dark-hover hover:text-primary-400 transition-colors">Settings</a> -->
+                                <div class="border-t border-dark-border my-1"></div>
+                                <button type="logout-button" hx-post="/logout" hx-trigger="click" class="w-full text-left px-4 py-2 text-sm text-dark-text-secondary hover:bg-dark-hover hover:text-primary-400 transition-colors">
+                                    Logout
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-grow">
+        {% block main_container %}
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-dark-text-primary mb-2">{% block page_title %}Welcome{% endblock %}</h2>
+                    <p class="text-dark-text-secondary">{% block page_description %}Build something amazing today{% endblock %}</p>
+                </div>
+
+             {%~ block content %}
+                    <div class="glass rounded-xl p-6 shadow-2xl">
+                        <div class="text-center py-12">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20 mb-4">
+                                <svg class="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold text-dark-text-primary mb-2">Ready to Start</h3>
+                            <p class="text-dark-text-secondary mb-6">Your content goes here</p>
+                            <button class="btn-primary text-white font-medium py-2 px-6 rounded-lg hover-lift">
+                                Get Started
+                            </button>
+                        </div>
+                    </div>
+                    {% endblock ~%}
+                </div>
+            {% endblock ~%}
+        </main>
+
+        {% block footer %}
+            {%~ include "_footer.html" ~%}
+        {% endblock %}
+
+
+        <script>
+            function toggleDarkMode() {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            }
+
+            if (localStorage.getItem('darkMode') === 'true' || !('darkMode' in localStorage)) {
+                document.documentElement.classList.add('dark');
+            }
+
+          window.apiFetch = function(url, options = {}) {
+              const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+              const defaultHeaders = {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': csrfToken
+              };
+
+              return fetch(url, {
+                  ...options,
+                  headers: {
+                      ...defaultHeaders,
+                      ...options.headers
+                  }
+              });
+          };
+        </script>
+        {% block extra_js %}
+        {% endblock %}
+    </body>
+</html>

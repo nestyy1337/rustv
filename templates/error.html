@@ -1,0 +1,31 @@
+{% extends "_layout.html" %}
+
+{% block title %}Yikes{% endblock %}
+
+{% block page_title %}{% endblock %}
+
+{% block page_description %}
+    Something broke. Massive skill issue.
+{% endblock %}
+
+{% block content %}
+<div class="error-container" style="max-width: 800px;">
+
+    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
+        Server refused to cooperate.
+        Here is the technical detail:
+    </p>
+
+    <div style="background-color: #1e1e1e; color: #ff6b6b; padding: 1.5rem; border-radius: 8px; font-family: monospace; border: 1px solid #444;">
+        <strong>Error: </strong> {{ error_message }}
+    </div>
+
+    <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
+        <a href="/" style="padding: 10px 20px; background-color: #333; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            &larr; Go Home
+        </a>
+        <span style="font-size: 0.9rem; opacity: 0.7;">(and pretend this never happened)</span>
+    </div>
+
+</div>
+{% endblock %}

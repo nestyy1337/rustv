@@ -1,0 +1,316 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ movie.title }} - RustTV{% endblock %}
+
+{% block page_title %}{{ movie.title }}{% endblock %}
+
+{% block page_description %}
+{{ movie.production_company }} • {{ movie.release_year }} • {{ movie.genre }}
+{% endblock %}
+
+{% block content %}
+<div class="glass rounded-xl overflow-hidden mb-6">
+    <div class="grid md:grid-cols-3 gap-8 p-8">
+
+        <div class="md:col-span-1">
+            <div class="aspect-[2/3] bg-gradient-to-br from-primary-600 to-accent-purple rounded-lg overflow-hidden flex items-center justify-center">
+                <img
+                  src="/api/movie/{{ movie.id }}/poster"
+                  alt="{{ movie.title }} poster"
+                  class="w-full h-full object-cover"
+                  onerror="this.style.display='none';"
+                />
+                <svg class="w-24 h-24 text-white/30 absolute" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="md:col-span-2 space-y-6">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <a href="/?genre={{ movie.genre | lower }}" class="px-3 py-1 bg-primary-500/20 text-primary-400 rounded-full text-sm font-medium hover:bg-primary-500/30 transition-colors">
+                        {{ movie.genre }}
+                    </a>
+                    <span class="text-dark-text-muted">{{ movie.release_year }}</span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+            {% if movie.state.is_available() %}
+
+                <a href="/watch/{{ movie.id }}">
+                <button class="btn-primary text-white font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2" btn-watch-movie>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Watch Now
+                </button>
+                </a>
+                {% else if movie.state.is_requested() %}
+                    <button class="btn-primary text-white font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2" btn-request-movie onclick="removeMovieRequest({{ movie.id }})">
+                    Movie has been requested, remove it?
+                </button>
+                </a>
+                {% else %}
+                <button class="btn-primary text-white font-medium py-3 px-6 rounded-lg
+                        hover-lift flex items-center gap-2" onclick="requsetMovie({{ movie.id }})">
+                        Request Movie
+                    </button>
+                    </a>
+                {% endif %}
+                {% if !self.watchlisted %}:
+                <button
+                    class="glass text-dark-text-primary font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500"
+                    onclick="addToWatchlist({{ movie.id }})">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Add to Watchlist
+                </button>
+                {% else %}
+                <button
+                    class="glass text-dark-text-primary font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500"
+                    onclick="removeFromWatchlist({{ movie.id }})">
+                    Remove from Watchlist
+                </button>
+                {% endif %}
+
+            {% if !self.watched %}
+            <button class="button-add-watched glass text-dark-text-primary font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500 opacity-50"
+        onclick="addToWatched({{ movie.id }})">
+                Add to Watched
+            </button>
+            {% else %}
+            <button class="button-remove-watched glass text-dark-text-primary font-medium py-3 px-6 rounded-lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500"
+        onclick="removeFromWatched({{ movie.id }})">
+                Remove from Watched
+            </button>
+            {% endif %}
+    {% if profile.is_admin %}
+            <a href="/admin/movies/{{ movie.id }}/edit">
+                <button class="glass text-dark-text-primary font-medium py-3 px-6 rounded
+-lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500">
+                    Edit Movie
+                </button>
+            </a>
+        {% endif %}
+    {% if !movie.state.is_available() && profile.is_admin %}
+        <a href="/admin/torrents/search/{{ movie.id }}">
+                <button class="glass text-dark-text-primary font-medium py-3 px-6 rounded
+                    -lg hover-lift flex items-center gap-2 border border-dark-border hover:border-primary-500">
+                    Search for torrents
+                </button>
+            </a>
+    {% endif %}
+
+            </div>
+
+            <div class="glass rounded-lg p-4 border border-dark-border">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-full bg-gradient-to-r from-primary-400 to-accent-purple flex items-center justify-center">
+                            <span class="text-white font-medium">{{ profile.display_name.chars().next().unwrap_or('U') }}</span>
+                        </div>
+                        <div>
+                            <p class="text-dark-text-primary font-medium">{{ profile.display_name }}</p>
+                            <p class="text-dark-text-muted text-sm">@{{ profile.username }}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-6 text-sm">
+                        <div class="text-center">
+                            <p class="text-primary-400 font-semibold">{{ profile.watchlist_count }}</p>
+                            <p class="text-dark-text-muted">Watchlist</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-accent-emerald font-semibold">{{ profile.watched_count }}</p>
+                            <p class="text-dark-text-muted">Watched</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-accent-cyan font-semibold">{{ profile.reviews_count }}</p>
+                            <p class="text-dark-text-muted">Reviews</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                <div class="glass rounded-lg p-4 border border-dark-border">
+                    <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Admin Actions</h3>
+                    <div class="flex flex-wrap gap-3">
+                        Available codecs:
+                    {% if let Some(streamable_video) = self.streamable %}
+                        {% for codec in streamable_video.formats %}
+                            {{ codec.to_string() }}
+                        {% endfor %}
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid {% if profile.is_admin %}md:grid-cols-4{% else %}md:grid-cols-3{% endif %} gap-6">
+    <div class="{% if profile.is_admin %}md:col-span-3{% else %}md:col-span-2{% endif %} space-y-6">
+        <div class="glass rounded-xl p-6">
+            <h3 class="text-xl font-semibold text-dark-text-primary mb-4">Overview</h3>
+            <p class="text-dark-text-secondary leading-relaxed">
+                {{ tmdb_movie.overview }}
+            </p>
+        </div>
+    <div class="space-y-6">
+        <div class="glass rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-dark-text-primary mb-4">Details</h3>
+            <dl class="space-y-3 text-sm">
+                <div>
+                    <dt class="text-dark-text-muted">Movie ID</dt>
+                    <dd class="text-dark-text-primary font-mono">{{ movie.id }}</dd>
+                </div>
+                {% if movie.created_at.is_some() %}
+                <div>
+                    <dt class="text-dark-text-muted">Added</dt>
+                    <dd class="text-dark-text-primary">{{ movie.created_at_string() }}</dd>
+                </div>
+                {% endif %}
+
+                 {% if let Some(runtime) = tmdb_movie.runtime %}
+                <div>
+                    <dt class="text-dark-text-muted">Runtime</dt>
+                    <dd class="text-dark-text-primary">{{ runtime }} minutes</dd>
+                </div>
+                {% endif %}
+
+                <div>
+                    <dt class="text-dark-text-muted">Average rating</dt>
+                    <dd class="text-dark-text-primary">{{ tmdb_movie.vote_average }}</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function addToWatchlist(movieId) {
+    try {
+        const response = await apiFetch(`/api/watchlist`, {
+            method: 'POST',
+            body: JSON.stringify({ movie_id: movieId }),
+        });
+
+        if (response.ok) {
+            alert('Movie added to your watchlist!');
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to add movie to watchlist.'));
+        }
+        window.location.reload();
+    } catch (error) {
+        console.error('Error adding movie to watchlist:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+
+async function removeFromWatchlist(movieId) {
+    try {
+        const response = await apiFetch(`/api/watchlist`, {
+            method: 'DELETE',
+            body: JSON.stringify({ movie_id: movieId }),
+        });
+
+        if (response.ok) {
+            alert('Movie removed from your watchlist!');
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to remove movie from watchlist.'));
+        }
+        window.location.reload();
+    } catch (error) {
+        console.error('Error removing movie from watchlist:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+
+
+async function removeFromWatched(movieId) {
+    try {
+        const response = await apiFetch(`/api/watched/{{ profile.username }}/{{ movie.id }}`, {
+            method: 'DELETE',
+            body: JSON.stringify({ movie_id: movieId }),
+        });
+
+        if (response.ok) {
+            alert('Movie removed from your watched list!');
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to remove movie from watched list.'));
+        }
+        window.location.reload();
+    } catch (error) {
+        console.error('Error removing movie from watched list:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+
+async function addToWatched(movieId) {
+    try {
+        const response = await apiFetch(`/api/watched/{{ profile.username }}/{{ movie.id }}`, {
+            method: 'POST',
+            body: JSON.stringify({ movie_id: movieId }),
+        });
+
+        if (response.ok) {
+            alert('Movie added to your watched list!');
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to add movie to watched list.'));
+        }
+        window.location.reload();
+    } catch (error) {
+        console.error('Error adding movie to watched list:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+
+async function requsetMovie(movieId) {
+    try {
+        const response = await apiFetch(`/api/movie/request`, {
+            method: 'POST',
+            body: JSON.stringify({ movie_id: {{ movie.id }} }),
+        });
+
+        if (response.ok) {
+            alert('Movie requested successfully!');
+            window.location.href = '/';
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to submit movie request.'));
+        }
+    } catch (error) {
+        console.error('Error requesting movie:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+
+async function removeMovieRequest(movieId) {
+    try {
+        const response = await apiFetch(`/api/movie/request`, {
+            method: 'DELETE',
+            body: JSON.stringify({ movie_id: {{ movie.id }} }),
+        });
+
+        if (response.ok) {
+            alert('Movie request removed successfully!');
+            window.location.href = '/';
+        } else {
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.message || 'Failed to submit movie request.'));
+        }
+    } catch (error) {
+        console.error('Error requesting movie:', error);
+        alert('An unexpected error occurred. Please try again later.');
+    }
+}
+</script>
+{% endblock %}
