@@ -290,6 +290,12 @@ pub enum Error {
         source: tokio::io::Error,
     },
 
+    #[snafu(display("AWS S3 {operation} failed: {source}"))]
+    AwsSDK {
+        operation: &'static str,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
     #[snafu(display("FFmpeg error during"))]
     FFmpegError {
         operation: &'static str,
@@ -309,6 +315,7 @@ impl axum::response::IntoResponse for Error {
         );
 
         let status = match &self {
+            Error::AwsSDK { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             // Auth errors
             Error::AuthError { source } => match source {
                 AuthError::UserNotFound { .. } => StatusCode::NOT_FOUND,

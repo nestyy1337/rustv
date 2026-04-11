@@ -14,6 +14,7 @@ pub trait HttpClient: Send + Sync {
     async fn get_bytes(&self, url: &str) -> Result<(Bytes, u16), Error>;
 }
 
+#[derive(Clone)]
 pub struct ReqwestHttpClient;
 
 #[async_trait::async_trait]

@@ -29,6 +29,14 @@ pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
     pub apikeys: ApiKeys,
+    #[cfg(feature = "s3")]
+    pub aws: AwsConfig,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct AwsConfig {
+    pub region: String,
+    pub bucket: String,
 }
 
 enum Environment {

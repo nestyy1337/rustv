@@ -5,203 +5,31 @@ use sqlx::{Pool, Sqlite, SqlitePool};
 use tokio::sync::RwLock;
 
 use crate::{
+    clients::tmdb::{ReqwestHttpClient, TmdbClient},
     handlers::movies::HlsSegmentUnchecked,
     models::{
-        movie::{Movie, MovieState, Watchlist},
+        movie::{Movie, MoviePath, MovieState, Watchlist},
         users::UserProfile,
     },
     repositories::movies::MovieRepository,
     services::{
         converter::{
-            Converter, RawVideoFormat, StreamableFormat, StreamableVideoFormat, VideoFile,
+            ConvertedVideo, Converter, RawVideoFormat, StreamableFormat, StreamableVideoFormat,
+            VideoFile,
         },
+        storage::MovieStorage,
         streaming::{IndexLocation, SegmentLocation},
         torrent::{ActiveDownload, ActiveProcessing},
     },
-    shared::error::{
-        Error, MovieError, MovieMissingReason, MovieNotAvailableSnafu, MovieNotFoundSnafu,
-        MovieSegmentSnafu, TokioIoSnafu,
+    shared::{
+        config::SETTINGS,
+        error::{Error, MovieError, TokioIoSnafu},
     },
 };
 
 use super::movies::MovieService;
 
-const DOWNLOADS_PATH: &str = "./downloads/";
-const MOVIES_PATH: &str = "./movies/";
 pub const VIDEOABLE_EXE_EXTENSIONS: [&str; 6] = ["mkv", "mp4", "avi", "ts", "m3u8", "mpd"];
-
-pub struct MovieStoragePaths {
-    pub downloads_path: String,
-    pub movies_path: String,
-}
-
-#[async_trait::async_trait]
-pub trait MovieStoreage {
-    fn downloads_path(&self) -> &str;
-    fn movies_path(&self) -> &str;
-    async fn get_raw_movie_parts(&self, movie_id: i64) -> Result<MovieStoragePaths, Error>;
-    async fn transfer_movies(&self, movie: &StreamableVideo) -> Result<(), Error>;
-    async fn get_m3u8_content(&self, movie_id: i64) -> Result<IndexLocation, Error>;
-    async fn get_streamable(&self, movie_id: i64) -> Result<Option<StreamableVideo>, Error>;
-    async fn segment_bytes(
-        &self,
-        movie_id: i64,
-        segment: HlsSegmentUnchecked,
-    ) -> Result<SegmentLocation, Error>;
-}
-
-#[derive(Clone)]
-pub struct NaiveMovieStorage {
-    downloads_path: String,
-    movies_path: String,
-    pool: Pool<Sqlite>,
-}
-
-impl NaiveMovieStorage {
-    pub fn new(pool: Pool<Sqlite>) -> Self {
-        NaiveMovieStorage {
-            downloads_path: DOWNLOADS_PATH.to_string(),
-            movies_path: MOVIES_PATH.to_string(),
-            pool,
-        }
-    }
-    pub fn with_paths(downloads_path: String, movies_path: String, pool: Pool<Sqlite>) -> Self {
-        NaiveMovieStorage {
-            downloads_path,
-            movies_path,
-            pool,
-        }
-    }
-
-    fn find_raw_streamable(&self, movie: &Movie) -> Result<StreamableVideo, Error> {
-        if movie.state != MovieState::Available {
-            return Err(MovieNotFoundSnafu {
-                movie_id: movie.id,
-                reason: MovieMissingReason::NotProcessed,
-            }
-            .build()
-            .into());
-        }
-
-        let path = PathBuf::from(format!("{}{}/", self.movies_path, movie.id));
-        let formats = StreamableVideoFormat::try_from_movie_path(&path)?;
-
-        Ok(StreamableVideo {
-            path,
-            formats,
-            movie: movie.clone(),
-        })
-    }
-}
-
-#[async_trait::async_trait]
-impl MovieStoreage for NaiveMovieStorage {
-    fn downloads_path(&self) -> &str {
-        &self.downloads_path
-    }
-    fn movies_path(&self) -> &str {
-        &self.movies_path
-    }
-
-    async fn segment_bytes(
-        &self,
-        movie_id: i64,
-        segment: HlsSegmentUnchecked,
-    ) -> Result<SegmentLocation, Error> {
-        let validated = segment
-            .validate()
-            .map_err(|_| MovieSegmentSnafu { movie_id }.build())?;
-
-        let movie = MovieRepository::get_movie_by_id(movie_id, &self.pool)
-            .await?
-            .ok_or(MovieError::SimpleMovieNotFound)?;
-        let streamable = self.find_raw_streamable(&movie)?;
-        let segment_path = streamable.path.join(validated.as_ref());
-
-        let bytes = tokio::fs::read(&segment_path).await.context(TokioIoSnafu {
-            operation: "reading segment file",
-        })?;
-
-        Ok(SegmentLocation::Local(bytes))
-    }
-
-    async fn get_streamable(&self, movie_id: i64) -> Result<Option<StreamableVideo>, Error> {
-        let movie = MovieRepository::get_movie_by_id(movie_id, &self.pool).await?;
-        if movie.is_none() {
-            return Ok(None);
-        }
-        let streamable = self.find_raw_streamable(&movie.unwrap())?;
-        Ok(Some(streamable))
-    }
-
-    async fn get_raw_movie_parts(&self, movie_id: i64) -> Result<MovieStoragePaths, Error> {
-        Ok(MovieStoragePaths {
-            downloads_path: format!("{}{}/", self.downloads_path, movie_id),
-            movies_path: format!("{}{}/", self.movies_path, movie_id),
-        })
-    }
-
-    async fn transfer_movies(&self, streamable: &StreamableVideo) -> Result<(), Error> {
-        let movie_path = PathBuf::from(&self.movies_path).join(format!("{}", streamable.movie.id));
-        tokio::fs::create_dir_all(&movie_path)
-            .await
-            .context(TokioIoSnafu {
-                operation: "creating movie directory",
-            })?;
-
-        let downloads_path =
-            PathBuf::from(&self.downloads_path).join(format!("{}", streamable.movie.id));
-        let mut entries = tokio::fs::read_dir(&downloads_path)
-            .await
-            .context(TokioIoSnafu {
-                operation: "reading converted videos directory",
-            })?;
-        while let Some(entry) = entries.next_entry().await.context(TokioIoSnafu {
-            operation: "reading converted video entry",
-        })? {
-            if !entry.path().is_file() {
-                continue;
-            }
-            let dest_path = movie_path.join(entry.file_name());
-            tracing::info!(
-                "Moving converted file {:?} to {:?}",
-                entry.path(),
-                dest_path
-            );
-            tokio::fs::copy(entry.path(), &dest_path)
-                .await
-                .context(TokioIoSnafu {
-                    operation: "copying converted file to movies directory",
-                })?;
-        }
-        tracing::info!(
-            movie_id = streamable.movie.id,
-            movie_path = ?movie_path,
-            "Transferred movie files to movies directory"
-        );
-        Ok(())
-    }
-
-    async fn get_m3u8_content(&self, movie_id: i64) -> Result<IndexLocation, Error> {
-        let movie = MovieRepository::get_movie_by_id(movie_id, &self.pool)
-            .await?
-            .ok_or(MovieError::SimpleMovieNotFound)?;
-
-        let streamable = self.find_raw_streamable(&movie)?;
-
-        let m3u8_path = streamable.path.join("index.m3u8");
-        if !m3u8_path.exists() {
-            return Err(MovieNotFoundSnafu {
-                movie_id,
-                reason: MovieMissingReason::NoFile,
-            }
-            .build()
-            .into());
-        }
-
-        Ok(IndexLocation::Local(m3u8_path))
-    }
-}
 
 #[derive(Debug)]
 pub struct MovieManagerState {
@@ -209,16 +37,17 @@ pub struct MovieManagerState {
 }
 
 #[derive(Clone)]
-pub struct MovieManager<T: MovieStoreage + Clone + Send + Sync> {
+pub struct MovieManager {
     pub inner: Arc<RwLock<MovieManagerState>>,
     pub movie_service: Arc<dyn MovieService + Send + Sync>,
-    storage: T,
+    storage: Arc<dyn MovieStorage + Send + Sync>,
+    tmdb_client: Arc<TmdbClient<ReqwestHttpClient>>,
     pub pool: Pool<Sqlite>,
 }
 
 #[derive(Debug)]
 pub struct StreamableVideo {
-    pub path: PathBuf,
+    pub path: MoviePath,
     pub formats: Vec<StreamableVideoFormat>,
     pub movie: Movie,
 }
@@ -236,9 +65,34 @@ pub enum DirectoryType {
     Movies,
 }
 
-impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
+impl MovieManager {
     pub fn downloads_path(&self) -> &str {
-        self.storage.downloads_path()
+        "./downloads/"
+    }
+
+    pub async fn get_poster(&self, movie_id: i64) -> Result<Option<Vec<u8>>, Error> {
+        if let Some(poster) = self.storage.get_poster(movie_id).await? {
+            return Ok(Some(poster));
+        }
+
+        let movie = MovieRepository::get_movie_by_id(movie_id, &self.pool)
+            .await?
+            .ok_or(MovieError::SimpleMovieNotFound)?;
+
+        let tmdb_movie = if let Some(tmdb_movie) =
+            MovieRepository::get_tmdb_movie_by_imdb_id(&movie.imdb_id, &self.pool).await?
+        {
+            tmdb_movie
+        } else if let Some(tmdb_match) = self.tmdb_client.search_by_imdb_id(&movie.imdb_id).await? {
+            self.tmdb_client
+                .get_movie_details(&tmdb_match.id.to_string())
+                .await?
+        } else {
+            return Ok(None);
+        };
+
+        let poster = self.tmdb_client.get_poster(tmdb_movie, movie_id).await?;
+        Ok(Some(poster.to_vec()))
     }
 
     pub async fn complete_download(
@@ -264,7 +118,6 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
             movie_id = streamable.movie.id,
             "Processed downloaded movie to streamable format"
         );
-        self.transfer_movies(&streamable).await?;
         self.add_available_movie(streamable).await?;
 
         Ok(())
@@ -278,90 +131,31 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
         self.storage.segment_bytes(movie_id, segment).await
     }
 
+    // #[tracing::instrument(name = "verifying downloaded movie", skip(self, movie))]
+    // async fn verify_downloaded_movie(&self, movie: &Movie) -> Result<(), Error> {
+    //     let downloaded_movie_dir = PathBuf::from(format!("{}{}/", self.downloads_path(), movie.id));
+    //     if !downloaded_movie_dir.exists() {
+    //         tracing::error!(
+    //             "Downloaded movie directory does not exist for movie ID: {} at path: {:?}",
+    //             movie.id,
+    //             downloaded_movie_dir
+    //         );
+    //         return Err(MovieError::SimpleMovieNotAvailable.into());
+    //     }
+    //
+    //     self.verity_directory_content(&downloaded_movie_dir, DirectoryType::Downloaded)
+    //         .await?;
+    //     Ok(())
+    // }
+
     #[tracing::instrument(name = "verifying downloaded movie", skip(self, movie))]
     async fn verify_downloaded_movie(&self, movie: &Movie) -> Result<(), Error> {
-        let downloaded_movie_dir = PathBuf::from(format!("{}{}/", self.downloads_path(), movie.id));
-        if !downloaded_movie_dir.exists() {
-            tracing::error!(
-                "Downloaded movie directory does not exist for movie ID: {} at path: {:?}",
-                movie.id,
-                downloaded_movie_dir
-            );
-            return Err(MovieError::SimpleMovieNotAvailable.into());
-        }
-
-        self.verity_directory_content(&downloaded_movie_dir, DirectoryType::Downloaded)
-            .await?;
+        self.storage.verify_movie_content(movie.id).await?;
         Ok(())
-    }
-
-    async fn verity_directory_content(
-        &self,
-        dir_path: &PathBuf,
-        dir_type: DirectoryType,
-    ) -> Result<(), Error> {
-        if !dir_path.exists() || !dir_path.is_dir() {
-            return Err(MovieNotAvailableSnafu {
-                movie_id: 0,
-                movie_state: MovieState::Unavailable,
-            }
-            .build())?;
-        }
-
-        let mut entries = tokio::fs::read_dir(dir_path).await.context(TokioIoSnafu {
-            operation: "reading directory",
-        })?;
-
-        let mut has_valid_files = false;
-
-        while let Some(entry) = entries.next_entry().await.context(TokioIoSnafu {
-            operation: "reading directory entry",
-        })? {
-            let path = entry.path();
-
-            if path.is_file() {
-                match dir_type {
-                    DirectoryType::Downloaded => {
-                        if let Some(ext) = path.extension()
-                            && (ext == "mkv" || ext == "mp4" || ext == "avi")
-                        {
-                            has_valid_files = true;
-                            break;
-                        }
-                    }
-                    DirectoryType::Movies => {
-                        if let Some(ext) = path.extension()
-                            && (ext == "m3u8" || ext == "mpd")
-                        {
-                            has_valid_files = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if has_valid_files {
-            Ok(())
-        } else {
-            Err(MovieNotAvailableSnafu {
-                movie_id: 0,
-                movie_state: MovieState::Unavailable,
-            }
-            .build())?
-        }
     }
 
     pub async fn get_m3u8_content(&self, movie_id: i64) -> Result<IndexLocation, Error> {
         self.storage.get_m3u8_content(movie_id).await
-    }
-
-    pub async fn transfer_movies(&self, streamable: &StreamableVideo) -> Result<(), Error> {
-        self.storage.transfer_movies(streamable).await
-    }
-
-    pub fn movies_path(&self) -> &str {
-        self.storage.movies_path()
     }
 
     pub async fn is_watched(&self, user_id: i64, movie_id: i64) -> Result<bool, Error> {
@@ -387,37 +181,6 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
         MovieRepository::mark_available(movie.id, &self.pool).await?;
         self.inner.write().await.available_movies.push(movie);
         tracing::info!(movie_id = id, "Added movie to available movies");
-        Ok(())
-    }
-
-    #[tracing::instrument(name = "deleting movie directory", skip(self))]
-    async fn delete_movie_directory(&self, movie_id: i64) -> Result<(), Error> {
-        let movie_dir = PathBuf::from(format!("{}/{}", self.movies_path(), movie_id));
-        if movie_dir.exists() && movie_dir.is_dir() {
-            let mut entries = tokio::fs::read_dir(&movie_dir)
-                .await
-                .context(TokioIoSnafu {
-                    operation: "reading movie directory",
-                })?;
-            while let Some(entry) = entries.next_entry().await.context(TokioIoSnafu {
-                operation: "reading movie directory entry",
-            })? {
-                let path = entry.path();
-                if path.is_file()
-                    && VIDEOABLE_EXE_EXTENSIONS
-                        .iter()
-                        .any(|&ext| path.extension().is_some_and(|file_ext| file_ext == ext))
-                {
-                    tokio::fs::remove_file(path).await.context(TokioIoSnafu {
-                        operation: "deleting movie file from directory",
-                    })?;
-                }
-            }
-        }
-        tracing::info!(
-            movie_id = movie_id, movie_path = ?movie_dir,
-            "Deleted streamable movie directory contents"
-        );
         Ok(())
     }
 
@@ -603,7 +366,7 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
         converter: &dyn crate::services::converter::Converter<Error = Error>,
     ) -> Result<StreamableVideo, Error> {
         let movie = downloaded.movie.clone();
-        let _id = movie.id;
+        let id = movie.id;
         tracing::info!(
             movie_id = movie.id,
             "Processing downloaded movie to available movies"
@@ -622,9 +385,20 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
         //     .build())?;
         // }
 
-        let streamable = converter
+        let converted = converter
             .convert(&videofile, StreamableFormat::HLS, movie, processing)
             .await?;
+
+        tracing::info!(
+            movie_id = id,
+            "Finished converting downloaded movie to streamable format"
+        );
+
+        let streamable = self.storage.save_converted(converted).await?;
+        tracing::info!(
+            movie_id = id,
+            "Saved converted movie to storage and created streamable video representation"
+        );
 
         Ok(streamable)
     }
@@ -635,10 +409,14 @@ impl<T: MovieStoreage + Send + Sync + Clone> MovieManager<T> {
     }
 }
 
-impl MovieManager<NaiveMovieStorage> {
-    #[tracing::instrument(name = "initializing movie manager", skip(pool, movie_service))]
+impl MovieManager {
+    #[tracing::instrument(
+        name = "initializing movie manager",
+        skip(pool, storage, movie_service)
+    )]
     pub async fn initialize(
         movie_service: Arc<dyn MovieService + Send + Sync>,
+        storage: Arc<dyn MovieStorage + Send + Sync>,
         pool: &SqlitePool,
     ) -> Self {
         tracing::info!("Initializing Movie Manager");
@@ -646,9 +424,11 @@ impl MovieManager<NaiveMovieStorage> {
         let manager_state = MovieManagerState {
             available_movies: Vec::new(),
         };
+        let tmdb_client = Arc::new(TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone()));
         let mut manager = MovieManager {
             inner: Arc::new(RwLock::new(manager_state)),
-            storage: NaiveMovieStorage::new(pool.clone()),
+            storage,
+            tmdb_client,
             movie_service: movie_service.clone(),
             pool: pool.clone(),
         };
@@ -662,7 +442,7 @@ impl MovieManager<NaiveMovieStorage> {
         for movie in movies.iter() {
             if manager.verify_downloaded_movie(movie).await.is_err() {
                 let download_path =
-                    PathBuf::from(format!("{}{}/", manager.storage.downloads_path, movie.id));
+                    PathBuf::from(format!("{}{}/", manager.storage.downloads_path(), movie.id));
                 manager.cleanup_unfinished_download(&download_path).await;
                 tracing::info!(
                     "Cleaned up unfinished download for movie ID: {} at path: {:?}",
@@ -700,14 +480,10 @@ impl MovieManager<NaiveMovieStorage> {
             .await
             .available_movies
             .retain(|movie| movie.id != movie_id);
-        let movie_dir = PathBuf::from(format!("{}{}/", self.movies_path(), movie_id));
-        self.delete_movie_directory(movie_id).await?;
+        self.storage.delete_movie(movie_id).await?;
         MovieRepository::delete_movie_cascade(&self.pool, movie_id).await?;
 
-        tracing::info!(
-            movie_id = movie_id, movie_path = ?movie_dir,
-            "Removed streamable movie directory"
-        );
+        tracing::info!(movie_id = movie_id, "Removed streamable movie directory");
         Ok(())
     }
 
@@ -718,14 +494,12 @@ impl MovieManager<NaiveMovieStorage> {
     }
 
     async fn verify_base_paths(&self) {
-        // both of those will fail if the directories already exist, so we can ignore the result
         let _ = tokio::fs::create_dir_all(&self.downloads_path()).await;
-        let _ = tokio::fs::create_dir_all(&self.movies_path()).await;
     }
 }
 
 #[cfg(any(test, feature = "integration-tests"))]
-impl MovieManager<NaiveMovieStorage> {
+impl MovieManager {
     pub fn create_test() -> Self {
         use crate::shared::test_utils::TempDir;
 
@@ -733,6 +507,8 @@ impl MovieManager<NaiveMovieStorage> {
         let movie_service = Arc::new(crate::services::movies::SimpleMovieService::new(
             pool.clone(),
         ));
+
+        let tmdb_client = Arc::new(TmdbClient::new("test_api_key".to_string()));
 
         let download_path = TempDir::create()
             .expect("Failed to create temp dir for downloads")
@@ -747,14 +523,19 @@ impl MovieManager<NaiveMovieStorage> {
             .to_str()
             .unwrap()
             .to_string();
-        let naive_storage = NaiveMovieStorage::with_paths(download_path, movies_path, pool.clone());
+        let naive_storage = crate::services::storage::naive::NaiveMovieStorage::with_paths(
+            download_path,
+            movies_path,
+            pool.clone(),
+        );
 
         MovieManager {
             inner: Arc::new(RwLock::new(MovieManagerState {
                 available_movies: Vec::new(),
             })),
             movie_service,
-            storage: naive_storage,
+            tmdb_client,
+            storage: Arc::new(naive_storage),
             pool,
         }
     }

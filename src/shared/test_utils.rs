@@ -56,7 +56,11 @@ pub async fn setup_test_app() -> Result<(String, AppState)> {
         .expect("Failed to run migrations");
 
     let movie_service = SimpleMovieService::new(db_pool.clone());
-    let movie_manager = MovieManager::initialize(Arc::new(movie_service.clone()), &db_pool).await;
+    let storage = Arc::new(crate::services::storage::naive::NaiveMovieStorage::new(
+        db_pool.clone(),
+    ));
+    let movie_manager =
+        MovieManager::initialize(Arc::new(movie_service.clone()), storage, &db_pool).await;
     let download_manager = DownloadManager::new().await;
     let torrent_service = SimpleTorrentService::new(download_manager.clone(), &db_pool);
 

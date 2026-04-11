@@ -91,7 +91,7 @@ impl Streamable for HLS {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StreamableVideoFormat {
     HLS(HLS),
     MP4(MP4),
@@ -128,33 +128,6 @@ impl StreamableVideoFormat {
         }
 
         Ok(formats)
-    }
-}
-
-// FIXME: this cannot be not a trait method since we cannot be locked to storage backend
-impl TryFrom<Movie> for StreamableVideo {
-    type Error = Error;
-    fn try_from(movie: Movie) -> Result<Self, Self::Error> {
-        if movie.state != MovieState::Downloaded {
-            return Err(MovieNotFoundSnafu {
-                movie_id: movie.id,
-                reason: MovieMissingReason::NotProcessed,
-            }
-            .build()
-            .into());
-        }
-
-        let core_movie_dir = std::env::current_dir()
-            .expect("cannot read current_dir")
-            .join("movies")
-            .join(format!("{}", movie.id));
-        let formats = StreamableVideoFormat::try_from_movie_path(&core_movie_dir)?;
-
-        Ok(Self {
-            path: core_movie_dir,
-            formats,
-            movie,
-        })
     }
 }
 
@@ -206,7 +179,7 @@ pub trait Converter: Sync {
         convert_to: StreamableFormat,
         movie: Movie,
         processing_queue: Arc<RwLock<HashMap<String, ActiveProcessing>>>,
-    ) -> Result<StreamableVideo, Self::Error>;
+    ) -> Result<ConvertedVideo, Self::Error>;
     fn supports(&self, input_codec: &VideoCodec, output_format: &StreamableFormat) -> bool;
 }
 
@@ -320,6 +293,13 @@ impl TryFrom<&PathBuf> for VideoFile {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ConvertedVideo {
+    pub path: PathBuf,
+    pub formats: Vec<StreamableVideoFormat>,
+    pub movie: Movie,
+}
+
 #[derive(Clone, Debug)]
 pub struct FFmpegConverter;
 
@@ -333,7 +313,7 @@ impl Converter for FFmpegConverter {
         convert_to: StreamableFormat,
         movie: Movie,
         processing_queue: Arc<RwLock<HashMap<String, ActiveProcessing>>>,
-    ) -> Result<StreamableVideo, Self::Error> {
+    ) -> Result<ConvertedVideo, Self::Error> {
         let output_path = convert(input, &movie, &convert_to, processing_queue).await?;
         tracing::info!(output_path = ?output_path, "Converted video saved");
 
@@ -366,7 +346,7 @@ impl Converter for FFmpegConverter {
             "Video conversion completed"
         );
 
-        Ok(StreamableVideo {
+        Ok(ConvertedVideo {
             path: output_path,
             formats: vec![StreamableVideoFormat::HLS(hls)],
             movie,
@@ -437,6 +417,7 @@ async fn convert(
             "-i",
         ])
         .arg(&input.path)
+        .args(["-t", "120"])
         .args([
             "-vf",
             "scale_vaapi=format=nv12",

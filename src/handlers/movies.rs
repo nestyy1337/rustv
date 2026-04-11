@@ -30,9 +30,9 @@ use crate::{
     shared::{
         config::SETTINGS,
         error::{
-            AskamaRenderSnafu, AuthError, Error, HttpSnafu, MovieError, MovieMissingReason,
-            MovieNotFoundSnafu, ResultExt, SessionNotFoundSnafu, SimpleMovieNotFoundSnafu,
-            SimpleUserNotFoundSnafu, TokioIoSnafu,
+            AskamaRenderSnafu, AuthError, ClientRequestSnafu, Error, HttpSnafu, MovieError,
+            MovieMissingReason, MovieNotFoundSnafu, ResultExt, SessionNotFoundSnafu,
+            SimpleMovieNotFoundSnafu, SimpleUserNotFoundSnafu, TokioIoSnafu,
         },
         middleware::{AuthBackendSqlite, AuthSession, VerifiedCSRFToken},
     },
@@ -510,21 +510,8 @@ pub async fn get_poster(
     Path(movie_id): Path<i64>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, Error> {
-    let movie = MovieRepository::get_movie_by_id(movie_id, &state.pool).await;
-    let movie = match movie {
-        Ok(Some(m)) => m,
-        Ok(None) => {
-            tracing::warn!(movie_id = movie_id, "Movie not found");
-            return Err(MovieError::SimpleMovieNotFound.into());
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Database error while fetching movie");
-            return Err(e);
-        }
-    };
-    let file_path = format!("movies/{}/poster.jpg", movie_id);
-    if let Ok(file) = tokio::fs::read(&file_path).await {
-        tracing::info!(file_path = %file_path, "Serving poster from file");
+    let poster = state.movies_manager.get_poster(movie_id).await?;
+    if let Some(file) = poster {
         Ok(Response::builder()
             .status(200)
             .header("Content-Type", "image/jpeg")
@@ -532,16 +519,8 @@ pub async fn get_poster(
             .body(Body::from(file))
             .context(HttpSnafu)?)
     } else {
-        // we need to query the tmdb
-        let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
-        let movie = client.get_movie_details(&movie.imdb_id).await?;
-        let bytes_png = client.get_poster(movie, movie_id).await?;
-        Ok(Response::builder()
-            .status(200)
-            .header("Content-Type", "image/jpeg")
-            .header("Content-Length", bytes_png.len().to_string())
-            .body(Body::from(bytes_png))
-            .context(HttpSnafu)?)
+        tracing::warn!(movie_id = movie_id, "Poster not found for movie");
+        Err(MovieError::FetchPosterFailed.into())
     }
 }
 
@@ -736,8 +715,27 @@ pub async fn serve_m3u8(
                 .body(Body::from(content))
                 .context(HttpSnafu)
         }
-        IndexLocation::Remote(_url) => {
-            unimplemented!()
+        IndexLocation::Remote(url) => {
+            let content = reqwest::get(url)
+                .await
+                .context(ClientRequestSnafu {
+                    operation: "fetching remote m3u8 content",
+                    client: "reqwest",
+                    url: None,
+                })?
+                .text()
+                .await
+                .context(ClientRequestSnafu {
+                    operation: "reading remote m3u8 content",
+                    client: "reqwest",
+                    url: None,
+                })?;
+            Response::builder()
+                .status(200)
+                .header("Content-Type", "application/vnd.apple.mpegurl")
+                .header("Content-Length", content.len().to_string())
+                .body(Body::from(content))
+                .context(HttpSnafu)
         }
     }
 }
@@ -826,7 +824,12 @@ pub async fn stream_hls_test(
     Path((movie_id, segment)): Path<(i64, HlsSegmentUnchecked)>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, Error> {
-    //TODO: should return not found if movie's missing, bad request if segment's invalid
+    tracing::info!(
+        movie_id = movie_id,
+        segment = %segment,
+        "Received request for HLS segment"
+    );
+
     let segment_source = state
         .movies_manager
         .segment_bytes(movie_id, segment)
@@ -839,8 +842,13 @@ pub async fn stream_hls_test(
             .header("Content-Length", content.len().to_string())
             .body(Body::from(content))
             .context(HttpSnafu),
-        SegmentLocation::Remote(_url) => {
-            unimplemented!()
+        SegmentLocation::Remote(url) => {
+            println!("Redirecting to remote segment URL: {}", url);
+            Response::builder()
+                .status(302)
+                .header("Location", url)
+                .body(Body::empty())
+                .context(HttpSnafu)
         }
     }
 }

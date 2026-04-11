@@ -1,3 +1,5 @@
+#[cfg(all(feature = "fs", feature = "s3"))]
+compile_error!("feature \"fs\" and feature \"s3\" cannot be enabled at the same time");
 use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 
 use backend::{
@@ -5,6 +7,7 @@ use backend::{
     services::{
         movie_manager::MovieManager,
         movies::SimpleMovieService,
+        storage::naive::NaiveMovieStorage,
         torrent::{DownloadManager, SimpleTorrentService},
     },
     shared::{args::InputArgs, config::SETTINGS},
@@ -26,7 +29,26 @@ async fn main() {
     let socket_address = Ipv4Addr::from_str("0.0.0.0").unwrap();
 
     let movie_service = SimpleMovieService::new(db_pool.clone());
-    let movie_manager = MovieManager::initialize(Arc::new(movie_service.clone()), &db_pool).await;
+
+    #[cfg(feature = "fs")]
+    let storage: Arc<dyn backend::services::storage::MovieStorage + Send + Sync> =
+        Arc::new(NaiveMovieStorage::new(db_pool.clone()));
+
+    #[cfg(feature = "s3")]
+    let storage: Arc<dyn backend::services::storage::MovieStorage + Send + Sync> = {
+        let aws = &config.application.aws;
+        Arc::new(
+            backend::services::storage::s3::S3MovieStorage::new(
+                aws.bucket.clone(),
+                aws.region.clone(),
+                db_pool.clone(),
+            )
+            .await,
+        )
+    };
+
+    let movie_manager =
+        MovieManager::initialize(Arc::new(movie_service.clone()), storage, &db_pool).await;
     let converter = backend::services::converter::FFmpegConverter;
     let download_manager = DownloadManager::new().await;
 

@@ -13,7 +13,7 @@ use crate::{
     models::movie::Movie,
     services::{
         converter::{FFmpegConverter, RawVideoFormat, VideoCodec},
-        movie_manager::{MovieManager, MovieStoreage},
+        movie_manager::MovieManager,
     },
     shared::{
         config::SETTINGS,
@@ -31,6 +31,7 @@ pub trait HttpClient: Send + Sync {
     async fn get(&self, url: &str, query: &[(&str, &str)]) -> Result<String, reqwest::Error>;
 }
 
+#[derive(Clone)]
 pub struct ReqwestHttpClient {
     client: reqwest::Client,
 }
@@ -852,10 +853,7 @@ impl DownloadManager<TorrentSessionManager> {
         }
     }
 
-    pub async fn monitor_downloads<T: MovieStoreage + Send + Sync + Clone + 'static>(
-        self,
-        movie_manager: MovieManager<T>,
-    ) {
+    pub async fn monitor_downloads(self, movie_manager: MovieManager) {
         let processing = self.processing.clone();
         let converter = FFmpegConverter;
 

@@ -1,4 +1,7 @@
 use askama::Template;
+use aws_config::Region;
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_s3::Client;
 use axum::extract::{FromRef, Request};
 use axum::http::StatusCode;
 use axum::middleware::{Next, from_fn};
@@ -22,6 +25,7 @@ use crate::auth;
 use crate::handlers::admin::admin_console;
 use crate::handlers::errors::fallback_404;
 use crate::handlers::metrics::get_all_metrics;
+use crate::shared::config::SETTINGS;
 use crate::shared::error::{DatabaseSnafu, Error};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -45,13 +49,24 @@ use crate::models::users::UserProfile;
 use crate::repositories::movies::MovieRepository;
 use crate::repositories::users::UserProfileRepository;
 use crate::services::converter::FFmpegConverter;
-use crate::services::movie_manager::{MovieManager, NaiveMovieStorage};
+use crate::services::movie_manager::MovieManager;
 use crate::services::torrent::{DownloadManager, TorrentService, TorrentSessionManager};
 use crate::shared::logging::{
     trace_layer_make_span_with, trace_layer_on_request, trace_layer_on_response,
 };
 use crate::shared::middleware::{AuthBackendSqlite, AuthLayer, AuthSession};
 use crate::views::pages::FrontPageData;
+
+#[cfg(feature = "s3")]
+pub async fn aws_client() -> aws_sdk_s3::Client {
+    let region_provider =
+        RegionProviderChain::first_try(Region::new(SETTINGS.application.aws.region.clone()))
+            .or_default_provider();
+
+    let shared_config = aws_config::from_env().region(region_provider).load().await;
+    let client = Client::new(&shared_config);
+    client
+}
 
 async fn root(
     State(_state): State<Arc<AppState>>,
@@ -215,7 +230,8 @@ impl AppBuilder<AddressSet, PortSet> {
 pub struct AppState {
     pub pool: Pool<sqlx::Sqlite>,
     pub downloads: DownloadManager<TorrentSessionManager>,
-    pub movies_manager: MovieManager<NaiveMovieStorage>,
+    // pub movies_manager: MovieManager<NaiveMovieStorage>,
+    pub movies_manager: MovieManager,
     pub converter: FFmpegConverter,
     pub torrent_service: Arc<dyn TorrentService + Send + Sync>,
     pub streaming_service: Arc<dyn crate::services::streaming::StreamingService + Send + Sync>,
@@ -261,7 +277,7 @@ impl FromRef<AppState> for Arc<dyn crate::services::metrics::StateReporter + Sen
 impl AppState {
     pub async fn new(
         pool: Pool<sqlx::Sqlite>,
-        movie_manager: MovieManager<NaiveMovieStorage>,
+        movie_manager: MovieManager,
         download_manager: DownloadManager<TorrentSessionManager>,
         converter: FFmpegConverter,
         torrent_service: Arc<dyn TorrentService + Send + Sync>,

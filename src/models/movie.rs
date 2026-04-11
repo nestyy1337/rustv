@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use time::macros::format_description;
 
 use chrono::{DateTime, Utc};
@@ -84,6 +86,12 @@ impl MovieState {
     pub fn is_downloaded(&self) -> bool {
         matches!(self, MovieState::Downloaded)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum MoviePath {
+    Local(PathBuf),
+    Remote(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Eq, Clone)]

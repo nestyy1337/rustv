@@ -3,8 +3,6 @@ use crate::services::{
     torrent::{DownloadManager, TorrentSession, TorrentSessionManager},
 };
 
-use super::movie_manager::MovieStoreage;
-
 #[async_trait::async_trait]
 pub trait StateReporter {
     async fn report_movie_manager_state(&self) -> String;
@@ -12,14 +10,14 @@ pub trait StateReporter {
     async fn report_download_manager_state(&self) -> String;
 }
 
-pub struct SimpleStateReporter<T: MovieStoreage + Send + Sync + Clone> {
-    movie_manager: MovieManager<T>,
+pub struct SimpleStateReporter {
+    movie_manager: MovieManager,
     download_manager: DownloadManager<TorrentSessionManager>,
 }
 
-impl<T: MovieStoreage + Send + Sync + Clone> SimpleStateReporter<T> {
+impl SimpleStateReporter {
     pub fn new(
-        movie_manager: MovieManager<T>,
+        movie_manager: MovieManager,
         download_manager: DownloadManager<TorrentSessionManager>,
     ) -> Self {
         Self {
@@ -30,7 +28,7 @@ impl<T: MovieStoreage + Send + Sync + Clone> SimpleStateReporter<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: MovieStoreage + Send + Sync + Clone> StateReporter for SimpleStateReporter<T> {
+impl StateReporter for SimpleStateReporter {
     async fn report_movie_manager_state(&self) -> String {
         let movies_str = self
             .movie_manager
