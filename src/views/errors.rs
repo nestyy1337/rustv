@@ -8,6 +8,7 @@ pub struct ErrorPageData {
 }
 
 impl ErrorPageData {
+    #[must_use]
     pub fn new(error_message: String, csrf_token: String) -> Self {
         Self {
             error_message,

@@ -107,10 +107,10 @@ mod internal {
     impl TryFrom<LoginNextURLUnchecked> for LoginNextURL {
         type Error = ();
         fn try_from(unchecked: LoginNextURLUnchecked) -> Result<Self, ()> {
-            if !unchecked.starts_with("//") {
-                Ok(LoginNextURL(unchecked.0))
-            } else {
+            if unchecked.starts_with("//") {
                 Err(())
+            } else {
+                Ok(LoginNextURL(unchecked.0))
             }
         }
     }
@@ -144,7 +144,10 @@ mod post {
 
     use crate::shared::error::Error;
 
-    use super::*;
+    use super::{
+        AppState, Form, IntoResponse, LoginNextURL, Redirect, RegistrationForm, Response,
+        StatusCode, User, redirect_to_register_with_next,
+    };
 
     pub async fn login(
         mut auth_session: AuthSession<AuthBackendSqlite>,
@@ -161,8 +164,6 @@ mod post {
                 .header("HX-REDIRECT", "/")
                 .body(axum::body::Body::empty())
                 .unwrap();
-        } else {
-            info!("User not authenticated, proceeding with login");
         }
 
         let user = match auth_session.authenticate(&creds).await {
@@ -173,7 +174,7 @@ mod post {
             Ok(None) => {
                 info!("Authentication failed for user: {}", creds.username);
                 let mut login_url = "/login".to_string();
-                login_url = format!("{login_url}?next={}", redirect_url);
+                login_url = format!("{login_url}?next={redirect_url}");
                 return Redirect::to(&login_url).into_response();
             }
             Err(err) => {
@@ -188,7 +189,7 @@ mod post {
 
         let resp = Response::builder()
             .status(StatusCode::OK)
-            .header("HX-REDIRECT", redirect_url.deref())
+            .header("HX-REDIRECT", &*redirect_url)
             .body(axum::body::Body::empty())
             .unwrap();
         (csrf_token, resp).into_response()
@@ -230,7 +231,9 @@ mod get {
     use crate::shared::middleware::AuthBackendSqlite;
     use crate::shared::middleware::AuthSession;
 
-    use super::*;
+    use super::{
+        Html, IntoResponse, LoginTemplate, NextUrl, Query, RegisterTemplate, StatusCode, Template,
+    };
 
     // even though we have SameSite=Lax, we still want to protect against CSRF at the login page,
     // since login forms can be a target for CSRF attacks, so that the attacker can log the user
@@ -272,7 +275,7 @@ mod get {
 
     pub async fn logout(mut auth_session: AuthSession<AuthBackendSqlite>) -> impl IntoResponse {
         match auth_session.logout().await {
-            Ok(_) => ([("HX-REDIRECT", "/")], ()).into_response(),
+            Ok(()) => ([("HX-REDIRECT", "/")], ()).into_response(),
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }

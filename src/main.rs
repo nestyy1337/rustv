@@ -1,17 +1,24 @@
+#[cfg(not(any(feature = "fs", feature = "s3")))]
+compile_error!("either feature \"fs\" or feature \"s3\" must be enabled");
+
 #[cfg(all(feature = "fs", feature = "s3"))]
 compile_error!("feature \"fs\" and feature \"s3\" cannot be enabled at the same time");
 use std::{net::Ipv4Addr, str::FromStr, sync::Arc};
 
+#[cfg(feature = "fs")]
+use backend::services::storage::naive::NaiveMovieStorage;
+#[cfg(feature = "s3")]
+use backend::services::storage::s3::S3MovieStorage;
 use backend::{
     app::{AppBuilder, AppState},
     services::{
         movie_manager::MovieManager,
         movies::SimpleMovieService,
-        storage::naive::NaiveMovieStorage,
         torrent::{DownloadManager, SimpleTorrentService},
     },
     shared::{args::InputArgs, config::SETTINGS},
 };
+
 use clap::Parser;
 
 #[tokio::main]
@@ -58,9 +65,8 @@ async fn main() {
         async move { download_manager.monitor_downloads(movie_manager).await }
     });
 
-    let torrent_service = SimpleTorrentService::new(download_manager.clone(), &db_pool);
-    let streaming_service =
-        backend::services::streaming::SimpleStreamingService::new(movie_manager.clone());
+    let torrent_service = SimpleTorrentService::new();
+    let streaming_service = backend::services::streaming::SimpleStreamingService::new();
 
     let metrics_service = backend::services::metrics::SimpleStateReporter::new(
         movie_manager.clone(),

@@ -62,10 +62,9 @@ pub async fn setup_test_app() -> Result<(String, AppState)> {
     let movie_manager =
         MovieManager::initialize(Arc::new(movie_service.clone()), storage, &db_pool).await;
     let download_manager = DownloadManager::new().await;
-    let torrent_service = SimpleTorrentService::new(download_manager.clone(), &db_pool);
+    let torrent_service = SimpleTorrentService::new();
 
-    let streaming_service =
-        crate::services::streaming::SimpleStreamingService::new(movie_manager.clone());
+    let streaming_service = crate::services::streaming::SimpleStreamingService::new();
     let metrics_service = crate::services::metrics::SimpleStateReporter::new(
         movie_manager.clone(),
         download_manager.clone(),
@@ -84,7 +83,7 @@ pub async fn setup_test_app() -> Result<(String, AppState)> {
     .await;
 
     let app = AppBuilder::new()
-        .address(Ipv4Addr::new(127, 0, 0, 1))
+        .address(Ipv4Addr::LOCALHOST)
         .port(None)
         .tls(false)
         .prod(false)
@@ -116,7 +115,7 @@ pub async fn setup_test_app() -> Result<(String, AppState)> {
         app.run(db_pool).await.expect("Failed to run test app");
     });
 
-    let address = format!("http://{}", address);
+    let address = format!("http://{address}");
     Ok((address, state.clone()))
 }
 
@@ -142,90 +141,7 @@ pub fn test_user() -> User {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TempDir {
-    inner: PathBuf,
-}
-
-impl TempDir {
-    pub fn create() -> Result<Self, std::io::Error> {
-        let dir = std::env::temp_dir().join(format!("tempdir_{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir)?;
-        Ok(Self { inner: dir })
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        &self.inner
-    }
-}
-
-impl Deref for TempDir {
-    type Target = PathBuf;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for TempDir {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        if self.inner.exists() {
-            // should we really unwrap here?
-            std::fs::remove_dir_all(&self.inner).expect("Failed to remove temp dir");
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TempFile {
-    inner: PathBuf,
-}
-
-impl TempFile {
-    pub fn create(contents: &str, path: &Path) -> Result<Self, std::io::Error> {
-        let file_path = path.join(format!("tempfile_{}.txt", uuid::Uuid::new_v4()));
-        std::fs::write(&file_path, contents)?;
-        Ok(Self { inner: file_path })
-    }
-
-    pub fn create_named(name: &str, contents: &str, path: PathBuf) -> Result<Self, std::io::Error> {
-        let file_path = path.join(name);
-        std::fs::write(&file_path, contents)?;
-        Ok(Self { inner: file_path })
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        &self.inner
-    }
-}
-
-impl Deref for TempFile {
-    type Target = PathBuf;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-impl DerefMut for TempFile {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        if self.inner.exists() {
-            std::fs::remove_file(&self.inner).expect("Failed to remove temp file");
-        }
-    }
-}
-
+#[must_use]
 pub fn test_movie() -> crate::models::movie::Movie {
     crate::models::movie::Movie {
         id: i64::MAX,

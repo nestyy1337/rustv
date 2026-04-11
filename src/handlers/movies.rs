@@ -457,7 +457,7 @@ pub async fn test_player(
     let mut session_guard = auth_session.inner.lock().await;
     let last_known_timestamp: usize = session_guard
         .session_mut()
-        .get_value(format!("movie_{}", movie_id).as_ref())
+        .get_value(format!("movie_{movie_id}").as_ref())
         .await
         .unwrap_or(Some(serde_json::Value::Number(0.into())))
         .and_then(|v| v.as_str().map(|s| s.parse::<usize>().unwrap_or(0)))
@@ -489,13 +489,13 @@ pub async fn save_progress(
 
     let timestamp = payload
         .get("timestamp")
-        .and_then(|v| v.as_u64())
+        .and_then(serde_json::Value::as_u64)
         .ok_or(MovieError::FetchPosterFailed)?
         .to_string();
 
     session_guard
         .session_mut()
-        .insert(format!("movie_{}", movie_id).as_ref(), &timestamp)
+        .insert(format!("movie_{movie_id}").as_ref(), &timestamp)
         .await
         .map_err(|e| AuthError::SessionLayerError { source: e })?;
 
@@ -551,10 +551,14 @@ pub async fn search_tmdb_by_title(
     Ok(Json(movies))
 }
 
-pub async fn get_imdb_id_from_tmdb(Path(tmdb_id): Path<String>) -> Result<Json<Value>, Error> {
+pub async fn get_imdb_id_from_tmdb(
+    Path(tmdb_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Value>, Error> {
     tracing::info!(tmdb_id = %tmdb_id, "Getting IMDB ID from TMDB ID");
     let client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
     let tmdb_movie = client.get_movie_details(&tmdb_id).await?;
+    MovieRepository::insert_tmdb_movie(&tmdb_movie, &state.pool).await?;
 
     let imdb_id = tmdb_movie.imdb_id.ok_or(MovieError::SimpleMovieNotFound)?;
 
@@ -606,13 +610,21 @@ pub async fn request_movie_tmdb(
     let tmdb_client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
 
     let tmdb_movie = tmdb_client.get_movie_details(&payload.tmdb_id).await?;
+    let imdb_id = tmdb_movie
+        .imdb_id
+        .clone()
+        .ok_or(MovieError::SimpleMovieNotFound)?;
+    MovieRepository::insert_tmdb_movie(&tmdb_movie, &state.pool).await?;
 
-    let movie = MovieRepository::get_movie_by_imdb_id(
-        &state.pool,
-        &tmdb_movie.imdb_id.ok_or(MovieError::SimpleMovieNotFound)?,
-    )
-    .await?
-    .ok_or(MovieError::SimpleMovieNotFound)?;
+    let movie =
+        if let Some(movie) = MovieRepository::get_movie_by_imdb_id(&state.pool, &imdb_id).await? {
+            movie
+        } else {
+            let mut movie = Movie::from(tmdb_movie);
+            let id = MovieRepository::add_movie(&movie, &state.pool).await?;
+            movie.id = id;
+            movie
+        };
 
     MovieRepository::mark_requested(movie.id, &state.pool).await?;
     state
@@ -843,7 +855,7 @@ pub async fn stream_hls_test(
             .body(Body::from(content))
             .context(HttpSnafu),
         SegmentLocation::Remote(url) => {
-            println!("Redirecting to remote segment URL: {}", url);
+            println!("Redirecting to remote segment URL: {url}");
             Response::builder()
                 .status(302)
                 .header("Location", url)
@@ -859,8 +871,27 @@ pub async fn add_movie_by_imdb_id(
     _auth_session: AuthSession<AuthBackendSqlite>,
     _csrf: VerifiedCSRFToken,
 ) -> Result<impl IntoResponse, Error> {
-    let tmdb_client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
-    let tmdb_movie = tmdb_client.get_movie_details(&imdb_id).await?;
+    if let Some(movie) = MovieRepository::get_movie_by_imdb_id(&state.pool, &imdb_id).await? {
+        return Ok(Json(
+            serde_json::json!({"status": "success", "movie_id": movie.id}),
+        ));
+    }
+
+    let tmdb_movie = if let Some(tmdb_movie) =
+        MovieRepository::get_tmdb_movie_by_imdb_id(&imdb_id, &state.pool).await?
+    {
+        tmdb_movie
+    } else {
+        let tmdb_client = TmdbClient::new(SETTINGS.application.apikeys.tmdb.clone());
+        let tmdb_match = tmdb_client
+            .search_by_imdb_id(&imdb_id)
+            .await?
+            .ok_or(MovieError::SimpleMovieNotFound)?;
+        tmdb_client
+            .get_movie_details(&tmdb_match.id.to_string())
+            .await?
+    };
+
     MovieRepository::insert_tmdb_movie(&tmdb_movie, &state.pool).await?;
     let id = MovieRepository::add_movie(&Movie::from(tmdb_movie), &state.pool).await?;
     Ok(Json(

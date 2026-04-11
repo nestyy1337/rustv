@@ -1,4 +1,6 @@
+#[cfg(feature = "fs")]
 pub mod naive;
+#[cfg(feature = "s3")]
 pub mod s3;
 
 use crate::{
@@ -11,11 +13,6 @@ use crate::{
 };
 
 use super::movie_manager::StreamableVideo;
-
-pub struct MovieStoragePaths {
-    pub downloads_path: String,
-    pub movies_path: String,
-}
 
 #[async_trait::async_trait]
 pub trait MovieStorage: Send + Sync {

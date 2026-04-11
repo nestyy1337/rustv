@@ -11,10 +11,9 @@ pub async fn get_all_metrics(State(state): State<Arc<AppState>>) -> Result<Html<
 
     let combined_report = format!(
         "<h1>System Metrics Report</h1>\
-         <h2>Movie Manager State</h2><pre>{}</pre>\
-         <h2>System Metrics</h2><pre>{}</pre>\
-         <h2>Download Manager State</h2><pre>{}</pre>",
-        movie_manager_state, system_metrics, download_manager_state
+         <h2>Movie Manager State</h2><pre>{movie_manager_state}</pre>\
+         <h2>System Metrics</h2><pre>{system_metrics}</pre>\
+         <h2>Download Manager State</h2><pre>{download_manager_state}</pre>"
     );
 
     Ok(Html(combined_report))

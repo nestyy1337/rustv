@@ -1,4 +1,9 @@
 use futures::StreamExt;
+
+use snafu::ResultExt;
+use std::collections::HashMap;
+use tokio::sync::RwLock;
+
 use futures::stream::FuturesUnordered;
 use quick_xml::de::from_str;
 use reqwest::redirect::Policy;
@@ -43,6 +48,7 @@ impl Default for ReqwestHttpClient {
 }
 
 impl ReqwestHttpClient {
+    #[must_use]
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
             .redirect(Policy::limited(10))
@@ -70,23 +76,19 @@ pub enum TorrentServiceError {
 }
 
 #[derive(Clone)]
-pub struct SimpleTorrentService<T: TorrentSession + 'static> {
-    download_manager: DownloadManager<T>,
-    pool: Pool<Sqlite>,
+pub struct SimpleTorrentService {
     client: Arc<dyn HttpClient>,
 }
 
-impl<T: TorrentSession + 'static> SimpleTorrentService<T> {
-    pub fn new_with_client(
-        download_manager: DownloadManager<T>,
-        pool: &Pool<Sqlite>,
-        client: Arc<dyn HttpClient>,
-    ) -> Self {
-        Self {
-            download_manager,
-            pool: pool.clone(),
-            client,
-        }
+impl std::default::Default for SimpleTorrentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SimpleTorrentService {
+    pub fn new_with_client(client: Arc<dyn HttpClient>) -> Self {
+        Self { client }
     }
 }
 
@@ -99,8 +101,8 @@ pub enum MovieIdentifier<'a> {
 impl std::fmt::Display for MovieIdentifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MovieIdentifier::TmdbId(id) => write!(f, "{}", id),
-            MovieIdentifier::Title(title) => write!(f, "{}", title),
+            MovieIdentifier::TmdbId(id) => write!(f, "{id}"),
+            MovieIdentifier::Title(title) => write!(f, "{title}"),
         }
     }
 }
@@ -182,7 +184,7 @@ impl TryFrom<MagnetURIUnchecked> for MagnetURI {
 }
 
 #[async_trait::async_trait]
-impl TorrentService for SimpleTorrentService<TorrentSessionManager> {
+impl TorrentService for SimpleTorrentService {
     #[tracing::instrument(skip(self))]
     async fn search_raw_jackett(
         &self,
@@ -258,20 +260,16 @@ impl TorrentService for SimpleTorrentService<TorrentSessionManager> {
     }
 }
 
-impl std::fmt::Debug for SimpleTorrentService<TorrentSessionManager> {
+impl std::fmt::Debug for SimpleTorrentService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SimpleTorrentService").finish()
     }
 }
 
-impl SimpleTorrentService<TorrentSessionManager> {
-    pub fn new(
-        download_manager: DownloadManager<TorrentSessionManager>,
-        pool: &Pool<Sqlite>,
-    ) -> Self {
+impl SimpleTorrentService {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
-            download_manager,
-            pool: pool.clone(),
             client: Arc::new(ReqwestHttpClient::new()),
         }
     }
@@ -341,6 +339,7 @@ pub struct TorznabAttr {
 }
 
 impl Item<New> {
+    #[must_use]
     pub fn seeders(&self) -> Option<u32> {
         self.attributes
             .iter()
@@ -348,6 +347,7 @@ impl Item<New> {
             .and_then(|attr| attr.value.parse().ok())
     }
 
+    #[must_use]
     pub fn peers(&self) -> Option<u32> {
         self.attributes
             .iter()
@@ -357,20 +357,15 @@ impl Item<New> {
 }
 
 impl<S> Item<S> {
+    #[must_use]
     pub fn size_gb(&self) -> String {
         format!(
             "{:.1}",
             self.size
-                .map(|s| s as f64 / 1024.0 / 1024.0 / 1024.0)
-                .unwrap_or(0.0)
+                .map_or(0.0, |s| s as f64 / 1024.0 / 1024.0 / 1024.0)
         )
     }
 }
-
-use snafu::ResultExt;
-use sqlx::{Pool, Sqlite};
-use std::collections::HashMap;
-use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub struct ProcessingStatus {
@@ -390,6 +385,7 @@ impl Default for ProcessingStatus {
 }
 
 impl ProcessingStatus {
+    #[must_use]
     pub fn from_stderr(stderr: &str) -> Option<Self> {
         let mut elapsed: Option<String> = None;
         let mut speed: Option<String> = None;
@@ -440,6 +436,7 @@ impl From<ActiveDownload> for ActiveProcessing {
 }
 
 impl ActiveProcessing {
+    #[must_use]
     pub fn new(_movie: Movie) -> Self {
         Self {
             status: ProcessingStatus::default(),
@@ -546,7 +543,7 @@ impl TorrentSession for TorrentSessionManager {
                     .find(|download| download.movie.id == movie_id)
                     .ok_or_else(|| {
                         GenericSnafu {
-                            reason: format!("No active download found for movie ID {}", movie_id),
+                            reason: format!("No active download found for movie ID {movie_id}"),
                         }
                         .build()
                     })?;
@@ -644,6 +641,7 @@ impl std::fmt::Display for TorrentID {
 }
 
 impl TorrentID {
+    #[must_use]
     pub fn new(id: usize, movie_id: usize, tmdb_id: String) -> Self {
         Self {
             id,
@@ -692,14 +690,17 @@ pub struct ManagedTorrentHandle {
 }
 
 impl ManagedTorrentHandle {
+    #[must_use]
     pub fn stats(&self) -> TorrentStats {
         self.inner.torrent_stats()
     }
 
+    #[must_use]
     pub fn id(&self) -> usize {
         self.inner.torrent_id()
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<String> {
         self.inner.torrent_name()
     }
@@ -720,17 +721,21 @@ pub struct ActiveDownload {
 }
 
 impl ActiveDownload {
+    #[must_use]
     pub fn is_completed(&self) -> bool {
         matches!(self.status, DownloadStatus::Completed(_))
     }
+    #[must_use]
     pub fn is_downloading(&self) -> bool {
         matches!(self.status, DownloadStatus::Downloading { .. })
     }
+    #[must_use]
     pub fn is_failed(&self) -> bool {
         matches!(self.status, DownloadStatus::Failed(_))
             || self.handle.torrent_stats().error.is_some()
     }
 
+    #[must_use]
     pub fn status_text(&self) -> &str {
         match self.status {
             DownloadStatus::Initializing => "Initializing",
@@ -740,6 +745,7 @@ impl ActiveDownload {
         }
     }
 
+    #[must_use]
     pub fn downloaded(&self) -> String {
         match &self.status {
             DownloadStatus::Downloading { progress } => {
@@ -813,7 +819,7 @@ impl<T: TorrentSession> DownloadManager<T> {
     pub async fn stop_download(&self, tmdb_id: TorrentSearchType) -> Result<(), Error> {
         let download = self.session.delete(tmdb_id.clone()).await;
         match download {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::info!(tmdb_id = ?tmdb_id, "Stopped and removed download");
                 Ok(())
             }
@@ -861,7 +867,7 @@ impl DownloadManager<TorrentSessionManager> {
             let mut futures = FuturesUnordered::new();
             loop {
                 tokio::select! {
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                    () = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
                     tracing::debug!("Checking active downloads...");
 
                     let keys = self.session.get_download_keys().await;
@@ -921,7 +927,7 @@ impl DownloadManager<TorrentSessionManager> {
                 }
                     Some(result) = futures.next() => {
                           match result {
-                              Ok((_tmdb_id, id, Ok(_))) => {
+                              Ok((_tmdb_id, id, Ok(()))) => {
                                   tracing::info!(movie_id = id, "Successfully completed download pipeline");
                               }
                               Ok((tmdb_id, id, Err(e))) => {
@@ -990,6 +996,7 @@ impl DownloadProgress {
         }
     }
 
+    #[must_use]
     pub fn downloaded_bytes_progress(&self) -> String {
         // x out of y MB like x / y MB/GB
         let mut total_downloaded = 0u64;
@@ -1002,34 +1009,42 @@ impl DownloadProgress {
             human_bytes::human_bytes(total_size as f64)
         )
     }
+    #[must_use]
     pub fn downloaded_gb(&self) -> f64 {
         self.downloaded_bytes as f64 / 1024.0 / 1024.0 / 1024.0
     }
 
+    #[must_use]
     pub fn total_gb(&self) -> f64 {
         self.total_bytes as f64 / 1024.0 / 1024.0 / 1024.0
     }
 
+    #[must_use]
     pub fn downloaded_gb_str(&self) -> String {
         format!("{:.2} GB", self.downloaded_gb())
     }
 
+    #[must_use]
     pub fn total_gb_str(&self) -> String {
         format!("{:.2} GB", self.total_gb())
     }
 
+    #[must_use]
     pub fn percentage_rounded(&self) -> f32 {
         (self.percentage * 10.0).round() / 10.0
     }
 
+    #[must_use]
     pub fn is_downloading(&self) -> bool {
         matches!(self.status, DownloadStatus::Downloading { .. })
     }
 
+    #[must_use]
     pub fn is_completed(&self) -> bool {
         matches!(self.status, DownloadStatus::Completed(_))
     }
 
+    #[must_use]
     pub fn status_text(&self) -> &str {
         match &self.status {
             DownloadStatus::Failed(..) => "Failed",
@@ -1049,6 +1064,7 @@ pub enum DownloadStatus {
 }
 
 impl DownloadStatus {
+    #[must_use]
     pub fn from(stats: &TorrentStats, movie: &Movie) -> Self {
         let is_complete = stats.progress_bytes == stats.total_bytes && stats.total_bytes > 0;
         let has_error = stats.error.is_some();
@@ -1057,7 +1073,7 @@ impl DownloadStatus {
             DownloadStatus::Failed(stats.error.clone().unwrap())
         } else if is_complete {
             let torrent_download_path =
-                PathBuf::from("downloads").join(movie.title.replace(" ", "_"));
+                PathBuf::from("downloads").join(movie.title.replace(' ', "_"));
 
             DownloadStatus::Completed(DownloadedMovie {
                 title: movie.title.clone(),

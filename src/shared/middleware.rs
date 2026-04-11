@@ -130,22 +130,27 @@ impl AsRef<Session> for AuthSessionData {
 }
 
 impl AuthSessionData {
+    #[must_use]
     pub fn is_user(&self) -> bool {
         self.user.is_some()
     }
 
+    #[must_use]
     pub fn user_id(&self) -> Option<i64> {
         self.user.as_ref().map(|u| u.id)
     }
 
+    #[must_use]
     pub fn id(&self) -> Option<Id> {
         self.session.id()
     }
 
+    #[must_use]
     pub fn is_admin(&self) -> bool {
         self.user.as_ref().is_some_and(|u| u.is_admin)
     }
 
+    #[must_use]
     pub fn username(&self) -> Option<String> {
         self.user.as_ref().map(|u| u.username.clone())
     }
@@ -155,10 +160,12 @@ impl AuthSessionData {
         Ok(())
     }
 
+    #[must_use]
     pub fn data(&self) -> &UserAuthData {
         &self.data
     }
 
+    #[must_use]
     pub fn session(&self) -> &Session {
         &self.session
     }

@@ -135,7 +135,7 @@ impl std::fmt::Display for Logger {
             Logger::Pretty => "pretty",
             Logger::Json => "json",
         };
-        write!(f, "{}", logger)
+        write!(f, "{logger}")
     }
 }
 
@@ -164,7 +164,7 @@ pub fn trace_layer_make_span_with(request: &Request<Body>) -> Span {
     )
 }
 pub fn trace_layer_on_request(_request: &Request<Body>, _span: &Span) {
-    tracing::info!("Got request")
+    tracing::info!("Got request");
 }
 
 pub fn trace_layer_on_response(response: &Response<Body>, latency: Duration, span: &Span) {

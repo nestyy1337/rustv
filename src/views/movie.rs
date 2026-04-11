@@ -38,6 +38,7 @@ pub struct WatchedMovieDetailed {
 }
 
 impl WatchedMovieDetailed {
+    #[must_use]
     pub fn format_date(&self) -> String {
         let format = time::format_description::parse("[month repr:short] [day], [year]").unwrap();
         self.watched_at
@@ -45,6 +46,7 @@ impl WatchedMovieDetailed {
             .unwrap_or_else(|_| "Unknown date".to_string())
     }
 
+    #[must_use]
     pub fn imdb_url(&self) -> String {
         if let Some(id) = &self.imdb_id {
             format_imdb_url(id)
@@ -55,6 +57,7 @@ impl WatchedMovieDetailed {
 }
 
 impl WatchedMovieData {
+    #[must_use]
     pub fn new(
         movies: Vec<WatchedMovieDetailed>,
         profile: UserProfile,
@@ -68,8 +71,9 @@ impl WatchedMovieData {
     }
 }
 
+#[must_use]
 pub fn format_imdb_url(imdb_id: &str) -> String {
-    format!("https://www.imdb.com/title/{}/", imdb_id)
+    format!("https://www.imdb.com/title/{imdb_id}/")
 }
 
 #[derive(Template)]
@@ -81,6 +85,7 @@ pub struct RatingsPageData {
 }
 
 impl RatingsPageData {
+    #[must_use]
     pub fn new(
         movies: Vec<WatchedMovieDetailed>,
         profile: UserProfile,
@@ -107,6 +112,7 @@ pub struct MovieDetailsData {
 }
 
 impl MovieDetailsData {
+    #[must_use]
     pub fn new(
         movie: Movie,
         tmdb_movie: TmdbMovie,

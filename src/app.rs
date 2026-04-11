@@ -1,7 +1,4 @@
 use askama::Template;
-use aws_config::Region;
-use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::Client;
 use axum::extract::{FromRef, Request};
 use axum::http::StatusCode;
 use axum::middleware::{Next, from_fn};
@@ -25,7 +22,6 @@ use crate::auth;
 use crate::handlers::admin::admin_console;
 use crate::handlers::errors::fallback_404;
 use crate::handlers::metrics::get_all_metrics;
-use crate::shared::config::SETTINGS;
 use crate::shared::error::{DatabaseSnafu, Error};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -56,17 +52,6 @@ use crate::shared::logging::{
 };
 use crate::shared::middleware::{AuthBackendSqlite, AuthLayer, AuthSession};
 use crate::views::pages::FrontPageData;
-
-#[cfg(feature = "s3")]
-pub async fn aws_client() -> aws_sdk_s3::Client {
-    let region_provider =
-        RegionProviderChain::first_try(Region::new(SETTINGS.application.aws.region.clone()))
-            .or_default_provider();
-
-    let shared_config = aws_config::from_env().region(region_provider).load().await;
-    let client = Client::new(&shared_config);
-    client
-}
 
 async fn root(
     State(_state): State<Arc<AppState>>,
@@ -123,6 +108,7 @@ impl Default for AppBuilder<AddressNotSet, PortNotSet> {
 }
 
 impl AppBuilder<AddressNotSet, PortNotSet> {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             address: None,
@@ -150,6 +136,7 @@ impl<PortState> AppBuilder<AddressNotSet, PortState> {
 }
 
 impl<AddressState> AppBuilder<AddressState, PortNotSet> {
+    #[must_use]
     pub fn port(self, port: Option<usize>) -> AppBuilder<AddressState, PortSet> {
         AppBuilder {
             address: self.address,
@@ -162,6 +149,7 @@ impl<AddressState> AppBuilder<AddressState, PortNotSet> {
 }
 
 impl<AddressState, PortState> AppBuilder<AddressState, PortState> {
+    #[must_use]
     pub fn tls(self, tls: bool) -> Self {
         Self {
             address: self.address,
@@ -172,6 +160,7 @@ impl<AddressState, PortState> AppBuilder<AddressState, PortState> {
         }
     }
 
+    #[must_use]
     pub fn prod(self, prod: bool) -> Self {
         Self {
             address: self.address,

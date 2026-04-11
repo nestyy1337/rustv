@@ -26,6 +26,7 @@ pub struct SimpleMovieService {
 }
 
 impl SimpleMovieService {
+    #[must_use]
     pub fn new(pool: Pool<Sqlite>) -> Self {
         SimpleMovieService { pool }
     }

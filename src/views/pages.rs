@@ -11,6 +11,7 @@ pub struct FrontPageData {
 }
 
 impl FrontPageData {
+    #[must_use]
     pub fn new(user_profile: UserProfile, movies: Vec<Movie>, csrf_token: String) -> Self {
         Self {
             user_profile,

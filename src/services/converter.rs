@@ -9,11 +9,8 @@ use tokio::sync::RwLock;
 use tokio::{io::AsyncBufReadExt, process::Command};
 
 use crate::{
-    models::movie::{Movie, MovieState},
-    services::{
-        movie_manager::StreamableVideo,
-        torrent::{ActiveProcessing, ProcessingStatus},
-    },
+    models::movie::Movie,
+    services::torrent::{ActiveProcessing, ProcessingStatus},
     shared::error::{
         ConverterError, Error, FFmpegSnafu, IoSnafu, MovieMissingReason, MovieNotFoundSnafu,
         NotAvailableForConversionSnafu, TokioIoSnafu, UnsupportedCodecSnafu,
@@ -37,7 +34,7 @@ impl std::fmt::Display for VideoCodec {
             VideoCodec::AV1 => "av1",
             VideoCodec::HEVC => "hevc",
         };
-        write!(f, "{}", codec_str)
+        write!(f, "{codec_str}")
     }
 }
 
@@ -57,6 +54,7 @@ impl FromStr for VideoCodec {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct HLS {
     segment_duration: u32,
@@ -103,7 +101,7 @@ impl std::fmt::Display for StreamableVideoFormat {
             StreamableVideoFormat::HLS(_) => "HLS",
             StreamableVideoFormat::MP4(_) => "MP4",
         };
-        write!(f, "{}", format_str)
+        write!(f, "{format_str}")
     }
 }
 
@@ -142,6 +140,7 @@ pub enum RawVideoFormat {
 }
 
 impl RawVideoFormat {
+    #[must_use]
     pub fn from_extension(ext: &str) -> Option<Self> {
         match ext.to_lowercase().as_str() {
             "mkv" => Some(RawVideoFormat::MKV),
@@ -166,7 +165,7 @@ impl std::fmt::Display for StreamableFormat {
             StreamableFormat::HLS => "HLS",
             StreamableFormat::MP4 => "MP4",
         };
-        write!(f, "{}", format_str)
+        write!(f, "{format_str}")
     }
 }
 
@@ -288,7 +287,7 @@ impl TryFrom<&PathBuf> for VideoFile {
                     }
                     .build(),
                 )?,
-            path: path.to_path_buf(),
+            path: path.clone(),
         })
     }
 }
@@ -376,8 +375,9 @@ impl Converter for FFmpegConverter {
 }
 
 impl VideoFile {
+    #[must_use]
     pub fn parent(&self) -> Option<PathBuf> {
-        self.path.parent().map(|parent| parent.to_path_buf())
+        self.path.parent().map(std::path::Path::to_path_buf)
     }
 }
 
@@ -482,7 +482,7 @@ async fn convert(
     // passing the child-handle through a channel is an alternative and would probably be cleaner
     loop {
         tokio::select! {
-            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+            () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
                 while let Some(line) = reader.next_line().await.context(TokioIoSnafu {
                 operation: "reading ffmpeg stderr",
             })? {
@@ -507,7 +507,7 @@ async fn convert(
             }
         }
     }
-    Ok(base.to_path_buf())
+    Ok(base.clone())
 }
 
 #[cfg(test)]

@@ -16,6 +16,7 @@ pub struct SimpleStateReporter {
 }
 
 impl SimpleStateReporter {
+    #[must_use]
     pub fn new(
         movie_manager: MovieManager,
         download_manager: DownloadManager<TorrentSessionManager>,
@@ -52,7 +53,7 @@ impl StateReporter for SimpleStateReporter {
             .get_active_downloads()
             .await
             .iter()
-            .map(|download| download.1.downloaded().to_string())
+            .map(|download| download.1.downloaded().clone())
             .collect::<Vec<String>>()
             .join(", \n");
         format!(

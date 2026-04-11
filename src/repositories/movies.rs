@@ -33,13 +33,13 @@ impl MovieRepository {
         pool: Pool<Sqlite>,
     ) -> Result<Option<Vec<WatchedMovieDetailed>>, Error> {
         let movies = sqlx::query_as::<_, WatchedMovieDetailed>(
-        r#"
+        r"
         SELECT wm.id, m.imdb_id, wm.user_id, wm.movie_id, m.title, m.genre, m.release_year as year, wm.watched_at, wm.rating
         FROM watched_movies wm
         INNER JOIN movies m ON wm.movie_id = m.id
         WHERE wm.user_id = ?
         ORDER BY wm.watched_at DESC
-        "#,
+        ",
     )
     .bind(user.id)
     .fetch_all(&pool)
@@ -61,13 +61,13 @@ impl MovieRepository {
         pool: Pool<Sqlite>,
     ) -> Result<Option<Vec<WatchedMovieDetailed>>, Error> {
         let movies = sqlx::query_as::<_, WatchedMovieDetailed>(
-        r#"
+        r"
         SELECT wm.id, m.imdb_id, wm.user_id, wm.movie_id, m.title, m.genre, m.release_year as year, wm.watched_at, wm.rating
         FROM watched_movies wm
         INNER JOIN movies m ON wm.movie_id = m.id
         WHERE wm.user_id = ? AND wm.rating IS NOT NULL
         ORDER BY wm.watched_at DESC
-        "#,
+        ",
     )
     .bind(user.id)
     .fetch_all(&pool)
@@ -110,12 +110,12 @@ impl MovieRepository {
 
     pub async fn get_top10_latest_movies(pool: &Pool<Sqlite>) -> Result<Vec<Movie>, Error> {
         let movies = sqlx::query_as::<_, Movie>(
-            r#"
+            r"
             SELECT * FROM movies
             WHERE state = ?
             ORDER BY release_year DESC
             LIMIT 10
-            "#,
+            ",
         )
         .bind(MovieState::Available)
         .fetch_all(pool)
@@ -134,13 +134,13 @@ impl MovieRepository {
         pool: &Pool<Sqlite>,
         title: &str,
     ) -> Result<Vec<Movie>, Error> {
-        let pattern = format!("%{}%", title);
+        let pattern = format!("%{title}%");
         let movies = sqlx::query_as::<_, Movie>(
-            r#"
+            r"
             SELECT * FROM movies
             WHERE title LIKE ?
             ORDER BY release_year DESC
-            "#,
+            ",
         )
         .bind(pattern)
         .fetch_all(pool)
@@ -281,7 +281,7 @@ impl MovieRepository {
         let genres = Json(&movie.genres);
 
         let res = sqlx::query(
-            r#"
+            r"
         INSERT OR IGNORE INTO tmdb_movies (
             adult, backdrop_path, budget, genres, homepage,
             id, imdb_id, origin_country, original_language,
@@ -293,7 +293,7 @@ impl MovieRepository {
             ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
             ?19, ?20, ?21, ?22, ?23
         )
-        "#,
+        ",
         )
         .bind(movie.adult)
         .bind(&movie.backdrop_path)

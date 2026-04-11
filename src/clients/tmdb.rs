@@ -66,6 +66,7 @@ pub struct TmdbClient<T: HttpClient> {
 }
 
 impl TmdbClient<ReqwestHttpClient> {
+    #[must_use]
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
@@ -102,14 +103,14 @@ impl<T: HttpClient> TmdbClient<T> {
 
     pub async fn get_poster(&self, movie: TmdbMovie, movie_id: i64) -> Result<Bytes, Error> {
         if let Some(poster_path) = movie.poster_path {
-            let poster_url = format!("https://image.tmdb.org/t/p/w500{}", poster_path);
+            let poster_url = format!("https://image.tmdb.org/t/p/w500{poster_path}");
             tracing::info!(movie_title = %movie.title, poster_url = %poster_url, "Poster URL for movie");
 
             let (body, status) = self.http_client.get_bytes(&poster_url).await?;
 
             if status == 200 {
                 tracing::info!(movie_title = %movie.title, "Successfully fetched poster for movie");
-                let file_path = format!("movies/{}/poster.jpg", movie_id);
+                let file_path = format!("movies/{movie_id}/poster.jpg");
                 if let Some(parent) = std::path::Path::new(&file_path).parent() {
                     tokio::fs::create_dir_all(parent)
                         .await
@@ -130,13 +131,12 @@ impl<T: HttpClient> TmdbClient<T> {
                     })?;
                 tracing::info!(file_path = %file_path, "Saved poster");
                 return Ok(body);
-            } else {
-                tracing::error!(
-                    movie_title = %movie.title,
-                    status = status,
-                    "Failed to fetch poster for movie"
-                );
             }
+            tracing::error!(
+                movie_title = %movie.title,
+                status = status,
+                "Failed to fetch poster for movie"
+            );
         } else {
             tracing::info!(movie_title = %movie.title, "No poster available for movie");
         }

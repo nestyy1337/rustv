@@ -1,7 +1,3 @@
-// TODO: implement S3MovieStorage
-// This will implement the MovieStorage trait using AWS S3 as the backing store.
-//
-
 use std::path::PathBuf;
 
 use aws_sdk_s3::presigning::PresigningConfig;
@@ -19,10 +15,7 @@ use crate::{
         storage::MovieStorage,
         streaming::{IndexLocation, SegmentLocation},
     },
-    shared::error::{
-        AwsSDKSnafu, Error, MovieError, MovieMissingReason, MovieNotFoundSnafu, MovieSegmentSnafu,
-        TokioIoSnafu,
-    },
+    shared::error::{AwsSDKSnafu, Error, MovieError, MovieSegmentSnafu, TokioIoSnafu},
 };
 
 pub struct S3MovieStorage {
@@ -48,7 +41,7 @@ impl S3MovieStorage {
 
 #[async_trait::async_trait]
 impl MovieStorage for S3MovieStorage {
-    fn downloads_path(&self) -> &str {
+    fn downloads_path(&self) -> &'static str {
         "./downloads/"
     }
     async fn delete_movie(&self, movie_id: i64) -> Result<(), Error> {
@@ -171,7 +164,7 @@ impl MovieStorage for S3MovieStorage {
             .client
             .get_object()
             .bucket(&self.bucket)
-            .key(format!("movies/{}/index.m3u8", movie_id))
+            .key(format!("movies/{movie_id}/index.m3u8"))
             .presigned(
                 PresigningConfig::builder()
                     .expires_in(std::time::Duration::from_secs(3600))
@@ -189,11 +182,32 @@ impl MovieStorage for S3MovieStorage {
         ))
     }
     async fn get_poster(&self, movie_id: i64) -> Result<Option<Vec<u8>>, Error> {
+        let key = format!("movies/{movie_id}/poster.jpg");
+        let exists = self
+            .client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(&key)
+            .max_keys(1)
+            .send()
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+            .context(AwsSDKSnafu {
+                operation: "check poster exists in S3",
+            })?
+            .contents()
+            .iter()
+            .any(|object| object.key().is_some_and(|object_key| object_key == key));
+
+        if !exists {
+            return Ok(None);
+        }
+
         let bytes = self
             .client
             .get_object()
             .bucket(&self.bucket)
-            .key(format!("{}/poster.jpg", movie_id))
+            .key(&key)
             .send()
             .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
@@ -211,7 +225,7 @@ impl MovieStorage for S3MovieStorage {
     }
 
     async fn verify_movie_content(&self, movie_id: i64) -> Result<(), Error> {
-        let key = format!("movies/{}/index.m3u8", movie_id);
+        let key = format!("movies/{movie_id}/index.m3u8");
         self.client
             .head_object()
             .bucket(&self.bucket)
@@ -245,8 +259,7 @@ impl MovieStorage for S3MovieStorage {
             if !entry
                 .path()
                 .extension()
-                .map(|ext| ext == "m3u8" || ext == "ts")
-                .unwrap_or(false)
+                .is_some_and(|ext| ext == "m3u8" || ext == "ts")
             {
                 continue;
             }
@@ -264,7 +277,7 @@ impl MovieStorage for S3MovieStorage {
             self.client
                 .put_object()
                 .bucket(&self.bucket)
-                .key(format!("{}{}", movie_path, file_name))
+                .key(format!("{movie_path}{file_name}"))
                 .body(file_bytes.into())
                 .send()
                 .await

@@ -51,10 +51,11 @@ pub struct TmdbMovie {
 }
 
 impl TmdbMovie {
+    #[must_use]
     pub fn get_poster_url(&self) -> Option<String> {
         self.poster_path
             .as_ref()
-            .map(|path| format!("https://image.tmdb.org/t/p/w500{}", path))
+            .map(|path| format!("https://image.tmdb.org/t/p/w500{path}"))
     }
 }
 

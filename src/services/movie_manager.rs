@@ -8,14 +8,13 @@ use crate::{
     clients::tmdb::{ReqwestHttpClient, TmdbClient},
     handlers::movies::HlsSegmentUnchecked,
     models::{
-        movie::{Movie, MoviePath, MovieState, Watchlist},
+        movie::{Movie, MoviePath, Watchlist},
         users::UserProfile,
     },
     repositories::movies::MovieRepository,
     services::{
         converter::{
-            ConvertedVideo, Converter, RawVideoFormat, StreamableFormat, StreamableVideoFormat,
-            VideoFile,
+            Converter, RawVideoFormat, StreamableFormat, StreamableVideoFormat, VideoFile,
         },
         storage::MovieStorage,
         streaming::{IndexLocation, SegmentLocation},
@@ -66,7 +65,8 @@ pub enum DirectoryType {
 }
 
 impl MovieManager {
-    pub fn downloads_path(&self) -> &str {
+    #[must_use]
+    pub fn downloads_path(&self) -> &'static str {
         "./downloads/"
     }
 
@@ -282,7 +282,7 @@ impl MovieManager {
             .build()
         })?;
 
-        let target_file = target_dir.join(format!("video.{}", extension));
+        let target_file = target_dir.join(format!("video.{extension}"));
 
         tracing::info!(
             movie_id = download.movie.id,
@@ -439,7 +439,7 @@ impl MovieManager {
             .await
             .expect("failed to fetch all movies from database, cannot initialize Movie Manager");
 
-        for movie in movies.iter() {
+        for movie in &movies {
             if manager.verify_downloaded_movie(movie).await.is_err() {
                 let download_path =
                     PathBuf::from(format!("{}{}/", manager.storage.downloads_path(), movie.id));
@@ -547,9 +547,9 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::{
+        TempDir,
         models::movie::MovieState,
         services::movie_manager::{DirectoryType, MovieManager},
-        shared::test_utils::TempDir,
     };
 
     #[tokio::test]

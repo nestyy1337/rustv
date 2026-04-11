@@ -19,6 +19,7 @@ pub struct Watchlist {
 }
 
 impl Watchlist {
+    #[must_use]
     pub fn is_available(&self) -> bool {
         self.state.is_available()
     }
@@ -64,25 +65,31 @@ impl std::fmt::Display for MovieState {
             MovieState::Downloading => "Downloading",
             MovieState::Downloaded => "Downloaded",
         };
-        write!(f, "{}", state_str)
+        write!(f, "{state_str}")
     }
 }
 impl MovieState {
+    #[must_use]
     pub fn is_available(&self) -> bool {
         matches!(self, MovieState::Available)
     }
+    #[must_use]
     pub fn is_processing(&self) -> bool {
         matches!(self, MovieState::Processing)
     }
+    #[must_use]
     pub fn is_unavailable(&self) -> bool {
         matches!(self, MovieState::Unavailable)
     }
+    #[must_use]
     pub fn is_requested(&self) -> bool {
         matches!(self, MovieState::Requested)
     }
+    #[must_use]
     pub fn is_downloading(&self) -> bool {
         matches!(self, MovieState::Downloading)
     }
+    #[must_use]
     pub fn is_downloaded(&self) -> bool {
         matches!(self, MovieState::Downloaded)
     }
@@ -117,9 +124,10 @@ const DATEFORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[hour]:[minute] [month repr:short] [day], [year]");
 
 impl Movie {
+    #[must_use]
     pub fn created_at_string(&self) -> String {
         self.created_at
-            .map(|d| d.format(&DATEFORMAT).unwrap_or_default().to_string())
+            .map(|d| d.format(&DATEFORMAT).unwrap_or_default().clone())
             .unwrap_or_default()
     }
 }
@@ -134,8 +142,7 @@ impl From<TmdbMovie> for Movie {
             release_year: value
                 .release_date
                 .split_once('-')
-                .map(|(y, _)| y.parse::<i64>().unwrap_or(0))
-                .unwrap_or(0),
+                .map_or(0, |(y, _)| y.parse::<i64>().unwrap_or(0)),
             genre: value
                 .genres
                 .into_iter()
@@ -159,12 +166,11 @@ impl From<&TmdbMovie> for Movie {
             release_year: value
                 .release_date
                 .split_once('-')
-                .map(|(y, _)| y.parse::<i64>().unwrap_or(0))
-                .unwrap_or(0),
+                .map_or(0, |(y, _)| y.parse::<i64>().unwrap_or(0)),
             genre: value
                 .genres
                 .first()
-                .map(|g| g.to_string())
+                .map(std::string::ToString::to_string)
                 .unwrap_or_default(),
             state: MovieState::Unavailable,
             created_at: None,

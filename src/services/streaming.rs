@@ -1,8 +1,6 @@
 use reqwest::Url;
 use std::path::PathBuf;
 
-use crate::services::movie_manager::MovieManager;
-
 pub enum IndexLocation {
     Local(PathBuf),
     Remote(Url),
@@ -16,13 +14,18 @@ pub enum SegmentLocation {
 #[async_trait::async_trait]
 pub trait StreamingService {}
 
-pub struct SimpleStreamingService {
-    movie_manager: MovieManager,
-}
+pub struct SimpleStreamingService {}
 
 impl SimpleStreamingService {
-    pub fn new(movie_manager: MovieManager) -> Self {
-        Self { movie_manager }
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl std::default::Default for SimpleStreamingService {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

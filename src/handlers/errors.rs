@@ -2,6 +2,7 @@ use crate::{shared::error::Error, views::errors::ErrorPageData};
 use askama::Template;
 use axum::response::Html;
 
+#[must_use]
 pub fn render_error(error: Error) -> String {
     let error_data = ErrorPageData::new(Error::to_string(&error), String::new());
     error_data

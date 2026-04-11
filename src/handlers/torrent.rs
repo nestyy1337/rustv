@@ -158,10 +158,10 @@ pub async fn download_torrent(
     Ok(Json(GenericResponse {
         success: download.is_ok(),
         message: match download {
-            Ok(_) => "Download started successfully".to_string(),
+            Ok(()) => "Download started successfully".to_string(),
             Err(e) => {
                 tracing::error!(error = %e, "Download error");
-                format!("Failed to start download: {}", e)
+                format!("Failed to start download: {e}")
             }
         },
     }))

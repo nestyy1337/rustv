@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::{MovieStorage, MovieStoragePaths};
+use super::MovieStorage;
 
 const DOWNLOADS_PATH: &str = "./downloads/";
 const MOVIES_PATH: &str = "./movies/";
@@ -30,6 +30,7 @@ pub struct NaiveMovieStorage {
 }
 
 impl NaiveMovieStorage {
+    #[must_use]
     pub fn new(pool: Pool<Sqlite>) -> Self {
         NaiveMovieStorage {
             downloads_path: DOWNLOADS_PATH.to_string(),
@@ -37,6 +38,7 @@ impl NaiveMovieStorage {
             pool,
         }
     }
+    #[must_use]
     pub fn with_paths(downloads_path: String, movies_path: String, pool: Pool<Sqlite>) -> Self {
         NaiveMovieStorage {
             downloads_path,
@@ -118,7 +120,6 @@ impl MovieStorage for NaiveMovieStorage {
             return Ok(None);
         }
         let movie_path = PathBuf::from(format!("{}{}/", self.movies_path, movie_id));
-        println!("Checking for streamable content at path: {:?}", movie_path);
         if !movie_path.exists() || !movie_path.is_dir() {
             return Ok(None);
         }
@@ -172,7 +173,7 @@ impl MovieStorage for NaiveMovieStorage {
         let dir_path = PathBuf::from(format!("{}{}/", self.movies_path, movie_id));
         if !dir_path.exists() || !dir_path.is_dir() {
             return Err(MovieNotAvailableSnafu {
-                movie_id: 0,
+                movie_id,
                 movie_state: MovieState::Unavailable,
             }
             .build())?;
@@ -189,13 +190,12 @@ impl MovieStorage for NaiveMovieStorage {
         })? {
             let path = entry.path();
 
-            if path.is_file() {
-                if let Some(ext) = path.extension()
-                    && (ext == "m3u8" || ext == "mpd")
-                {
-                    has_valid_files = true;
-                    break;
-                }
+            if path.is_file()
+                && let Some(ext) = path.extension()
+                && (ext == "m3u8" || ext == "mpd")
+            {
+                has_valid_files = true;
+                break;
             }
         }
 
@@ -203,7 +203,7 @@ impl MovieStorage for NaiveMovieStorage {
             Ok(())
         } else {
             Err(MovieNotAvailableSnafu {
-                movie_id: 0,
+                movie_id,
                 movie_state: MovieState::Unavailable,
             }
             .build())?
@@ -230,12 +230,14 @@ impl MovieStorage for NaiveMovieStorage {
             if !entry.path().is_file() {
                 continue;
             }
+            if !entry
+                .path()
+                .extension()
+                .is_some_and(|ext| ext == "m3u8" || ext == "ts")
+            {
+                continue;
+            }
             tracing::info!(
-                "Saving converted file {:?} to {:?}",
-                entry.path(),
-                movie_path
-            );
-            println!(
                 "Saving converted file {:?} to {:?}",
                 entry.path(),
                 movie_path

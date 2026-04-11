@@ -34,6 +34,7 @@ impl Default for UserProfile {
 }
 
 impl UserProfile {
+    #[must_use]
     pub fn initials(&self) -> String {
         self.display_name
             .split_whitespace()
@@ -96,10 +97,12 @@ impl User {
         self.password_hash = password;
     }
 
+    #[must_use]
     pub fn session_auth_hash(&self) -> &[u8] {
         self.password_hash.as_bytes()
     }
 
+    #[must_use]
     pub fn id(&self) -> i64 {
         self.id
     }
